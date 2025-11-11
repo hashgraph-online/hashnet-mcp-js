@@ -1,0 +1,137 @@
+#!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
+import { copyFileSync, existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const dirname = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(dirname, '../..');
+
+const args = process.argv.slice(2);
+const command = args[0];
+
+if (!command || command === '--help' || command === '-h') {
+  printHelp();
+  process.exit(0);
+}
+
+if (command !== 'up') {
+  console.error(`Unknown command: ${command}`);
+  printHelp();
+  process.exit(1);
+}
+
+const flags = parseFlags(args.slice(1));
+const transport = (flags.transport ?? 'stdio').toLowerCase();
+const installOnly = Boolean(flags['install-only']);
+
+try {
+  ensureNodeVersion();
+  const packageManager = detectPackageManager();
+  installDependencies(packageManager);
+  ensureEnvFile();
+
+  if (installOnly) {
+    console.log('Dependencies installed. Skipping server launch (--install-only set).');
+    process.exit(0);
+  }
+
+  runServer(packageManager, transport);
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+}
+
+function printHelp() {
+  console.log(`Usage: npx @hol/hashnet-mcp up [options]\n\nOptions:\n  --transport <stdio|sse>  Choose the transport to start (default: stdio)\n  --install-only          Install deps and sync .env, then exit\n  -h, --help              Show this help message`);
+}
+
+function parseFlags(values: string[]) {
+  const cloned = [...values];
+  return cloned.reduce<Record<string, any>>((acc, entry, index) => {
+    if (entry.startsWith('--')) {
+      const [key, inlineValue] = entry.split('=');
+      const normalized = key.replace(/^--/, '');
+      if (inlineValue !== undefined) {
+        acc[normalized] = inlineValue;
+      } else {
+        const next = cloned[index + 1];
+        if (next && !next.startsWith('--')) {
+          acc[normalized] = next;
+          cloned.splice(index + 1, 1);
+        } else {
+          acc[normalized] = true;
+        }
+      }
+    }
+    return acc;
+  }, {});
+}
+
+function ensureNodeVersion() {
+  const major = Number(process.versions.node.split('.')[0]);
+  if (Number.isNaN(major) || major < 18) {
+    throw new Error(`Node.js 18+ is required (detected ${process.versions.node}).`);
+  }
+}
+
+function detectPackageManager(): 'pnpm' | 'npm' {
+  if (commandExists('pnpm')) {
+    return 'pnpm';
+  }
+
+  console.warn('pnpm not detected. Attempting to enable via corepack...');
+  const enabled = spawnSync('corepack', ['enable', 'pnpm'], { stdio: 'inherit' });
+  if (enabled.status === 0 && commandExists('pnpm')) {
+    return 'pnpm';
+  }
+
+  console.warn('Falling back to npm. Install pnpm globally for faster installs.');
+  return 'npm';
+}
+
+function commandExists(bin: string) {
+  try {
+    const result = spawnSync(bin, ['--version'], { stdio: 'ignore' });
+    return result.status === 0;
+  } catch {
+    return false;
+  }
+}
+
+function installDependencies(pm: 'pnpm' | 'npm') {
+  console.log(`Installing dependencies with ${pm}...`);
+  const installResult = spawnSync(pm, ['install'], {
+    cwd: projectRoot,
+    stdio: 'inherit',
+  });
+  if (installResult.status !== 0) {
+    throw new Error(`${pm} install failed.`);
+  }
+}
+
+function ensureEnvFile() {
+  const envPath = path.join(projectRoot, '.env');
+  const examplePath = path.join(projectRoot, '.env.example');
+  if (!existsSync(envPath) && existsSync(examplePath)) {
+    copyFileSync(examplePath, envPath);
+    console.log('Created .env from .env.example. Remember to fill in your credentials.');
+  }
+}
+
+function runServer(pm: 'pnpm' | 'npm', transport: string) {
+  if (!['stdio', 'sse'].includes(transport)) {
+    throw new Error(`Unsupported transport "${transport}". Use stdio or sse.`);
+  }
+  const script = transport === 'stdio' ? 'dev:stdio' : 'dev:sse';
+  console.log(`Starting ${transport} transport via ${pm} run ${script}...`);
+  const runner = ['run', script];
+  const child = spawnSync(pm, runner, {
+    cwd: projectRoot,
+    stdio: 'inherit',
+    env: { ...process.env },
+  });
+  if (child.status !== 0) {
+    throw new Error(`${pm} run ${script} exited with code ${child.status}`);
+  }
+}

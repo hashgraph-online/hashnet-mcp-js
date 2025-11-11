@@ -1,0 +1,41 @@
+app = "hashnet-mcp"
+primary_region = "iad"
+
+[build]
+  dockerfile = "deploy/Dockerfile"
+
+[env]
+  PORT = "3333"
+
+[[services]]
+  processes = ["app"]
+  protocol = "tcp"
+  internal_port = 3333
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+  [[services.tcp_checks]]
+    interval = "10s"
+    timeout = "2s"
+
+  [[services.http_checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "30s"
+    method = "GET"
+    path = "/healthz"
+
+[checks]
+  [checks.healthz]
+    type = "http"
+    port = 3333
+    interval = "15s"
+    timeout = "5s"
+    method = "GET"
+    path = "/healthz"

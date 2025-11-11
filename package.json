@@ -1,0 +1,69 @@
+{
+  "name": "@hol/hashnet-mcp",
+  "version": "1.0.0",
+  "description": "FastMCP server exposing Hashgraph Online Registry Broker tooling.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./cli/up": {
+      "import": "./dist/cli/up.js",
+      "default": "./dist/cli/up.js"
+    }
+  },
+  "bin": {
+    "hashnet-mcp": "./dist/cli/up.js"
+  },
+  "files": [
+    "dist",
+    "deploy",
+    "examples",
+    "README.md",
+    "AGENTS.md",
+    "todo.md"
+  ],
+  "scripts": {
+    "dev:stdio": "MCP_TRANSPORT=stdio tsx src/index.ts",
+    "dev:sse": "tsx src/index.ts",
+    "build": "tsup --config tsup.config.ts",
+    "start": "node dist/index.js",
+    "quickstart": "tsx scripts/quickstart.ts",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:tools": "tsx scripts/run-tool-suite.ts --spawn"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "pnpm@10.10.0",
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@vitest/coverage-v8": "^2.1.4",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.4"
+  },
+  "dependencies": {
+    "@hashgraphonline/standards-sdk": "^0.1.128",
+    "@hono/node-server": "^1.19.6",
+    "@modelcontextprotocol/sdk": "^1.21.1",
+    "bottleneck": "^2.19.5",
+    "fastmcp": "^3.22.0",
+    "hono": "^4.10.5",
+    "ioredis": "^5.8.2",
+    "pino": "^10.1.0",
+    "undici": "^7.16.0",
+    "zod": "^4.1.12"
+  }
+}

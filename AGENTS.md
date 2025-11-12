@@ -12,7 +12,9 @@ The MCP server lives in `src/` with three core modules: `mcp.ts` (tool wiring an
 - `pnpm start` — executes the compiled output (`node dist/index.js`) for production parity.
 - `pnpm test --run --coverage` — executes Vitest once with V8 coverage; `pnpm test` stays in watch mode.
 - `pnpm quickstart` — interactive DX script that installs deps, copies `.env`, runs smoke tests, and launches your preferred transport (stdio or SSE).
-- `pnpm test:tools` — end-to-end harness that connects to the HTTP-stream gateway via the official MCP client (Streamable HTTP transport) and calls every `hol.*` tool using sample payloads (set `TEST_UAID`, `TEST_CHAT_UAID`, `TEST_REGISTRATION_ATTEMPT_ID` to cover UAID/chat flows).
+- `pnpm test:tools` — end-to-end harness that connects to the HTTP-stream gateway via the official MCP client (Streamable HTTP transport) and calls every `hol.*` tool using sample payloads (set `TEST_UAID`, `TEST_CHAT_UAID`, `TEST_REGISTRATION_ATTEMPT_ID` to cover UAID/chat flows). The script manages its own server lifecycle; do **not** pass `--spawn` manually.
+- `pnpm test:tools:mock` — runs the same harness against the built-in mock MCP server so CI can exercise the exit flow without touching the real Registry Broker.
+- `BROKER_PROTOCOL_TOOLS=1` — optional flag to include `hol.listProtocols` / `hol.detectProtocol` in the tool suite; leave unset if your API key or environment doesn't expose those endpoints (the public staging broker returns 404).
 - `pnpm workflow:list` / `pnpm workflow:run <name>` — inspect and execute any workflow (pair with `examples/workflows/<workflow>.json` for sample payloads).
 - `pnpm workflow:register` — interactive wizard that runs the registration/chat/ops workflows and saves a JSON report (UAID + Claude snippet).
 - `pnpm workflow:register:advanced` — guided prompts for `workflow.registerAgentAdvanced` (additional registries + optional credit purchase).
@@ -65,6 +67,7 @@ Each workflow emits a structured report (steps, timings, context) whether execut
 - `BROKER_E2E=1` — opt into real broker hits in CI; otherwise the mock broker is used when available.
 - `BROKER_AUTO_TOP_UP=1` — opt into automatic broker purchases without HITL prompts (defaults to manual approvals).
 - X402 workflows also require EVM wallet details (see `examples/workflows/workflow.x402*.json`) plus any ledger challenge metadata referenced in the payload.
+- Tool-suite fixtures (optional): `TEST_UAID`, `TEST_CHAT_UAID`, `TEST_REGISTRATION_ATTEMPT_ID`, and `BROKER_PROTOCOL_TOOLS`. Populate them (see `.env.example`) so `pnpm test:tools` can exercise UAID/chat flows locally or skip protocol checks when the broker doesn’t expose those endpoints.
 Workflow pipelines declare their required env vars and will fail fast with a descriptive error if anything is missing; payload-specific secrets (OpenRouter tokens, Agentverse headers, bearer tokens) should be supplied via `.env` or injected by your CLI before invoking the workflow.
 
 ### Running `pnpm workflow:register`

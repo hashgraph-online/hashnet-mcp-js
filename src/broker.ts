@@ -77,7 +77,8 @@ export async function getCreditBalance(accountId?: string): Promise<CreditBalanc
   if (!config.registryBrokerApiKey) {
     throw new Error('REGISTRY_BROKER_API_KEY is required to fetch credit balances.');
   }
-  const url = new URL('/credits/balance', config.registryBrokerUrl);
+  const base = config.registryBrokerUrl.endsWith('/') ? config.registryBrokerUrl : `${config.registryBrokerUrl}/`;
+  const url = new URL('credits/balance', base);
   if (accountId) {
     url.searchParams.set('accountId', accountId);
   }

@@ -1,4 +1,5 @@
 #!/usr/bin/env tsx
+import 'dotenv/config';
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -13,6 +14,10 @@ const defaultEndpoint = 'http://localhost:3333/mcp/stream';
 
 const args = process.argv.slice(2);
 const options = parseArgs(args);
+if (options.mock) {
+  options.spawn = false;
+  options.endpoint = `http://127.0.0.1:${options.mockPort}/mcp/stream`;
+}
 
 const palette = {
   green: (text: string) => `\u001b[32m${text}\u001b[0m`,
@@ -126,11 +131,13 @@ const scenarios: Scenario[] = [
   {
     tool: 'hol.listProtocols',
     description: 'List protocols',
+    requiresEnv: ['BROKER_PROTOCOL_TOOLS'],
     payload: () => ({}),
   },
   {
     tool: 'hol.detectProtocol',
     description: 'Detect protocol',
+    requiresEnv: ['BROKER_PROTOCOL_TOOLS'],
     payload: () => ({ headers: { 'content-type': 'application/json' }, body: '{}' }),
   },
   {
@@ -168,11 +175,20 @@ const scenarios: Scenario[] = [
 
 async function main() {
   let child: ReturnType<typeof spawn> | undefined;
+  let mock: ReturnType<typeof spawn> | undefined;
   try {
-    if (options.spawn) {
-      child = spawn('pnpm', ['run', 'dev:sse'], {
+    if (options.mock) {
+      mock = spawn(getTsxBinary(), [path.join(projectRoot, 'scripts', 'mock-broker.ts')], {
         cwd: projectRoot,
-        env: { ...process.env, PORT: options.port?.toString() ?? '3333' },
+        env: { ...process.env, MOCK_BROKER_PORT: String(options.mockPort) },
+        stdio: 'inherit',
+      });
+      await delay(500);
+    }
+    if (options.spawn) {
+      child = spawn(getTsxBinary(), [path.join(projectRoot, 'src', 'index.ts')], {
+        cwd: projectRoot,
+        env: { ...process.env, PORT: options.port?.toString() ?? '3333', MCP_TRANSPORT: 'sse' },
         stdio: 'inherit',
       });
       await waitForHealth(options.endpoint);
@@ -202,9 +218,8 @@ async function main() {
     }
     await client.close();
   } finally {
-    if (child) {
-      child.kill('SIGINT');
-    }
+    await stopProcess(child, 'SIGINT');
+    await stopProcess(mock, 'SIGINT');
   }
 }
 
@@ -252,9 +267,11 @@ function truncate(text: string, max = 200) {
 }
 
 function parseArgs(argv: string[]) {
-  const opts: { endpoint: string; spawn: boolean; port?: number } = {
+  const opts: { endpoint: string; spawn: boolean; port?: number; mock?: boolean; mockPort: number } = {
     endpoint: defaultEndpoint,
     spawn: false,
+    mock: false,
+    mockPort: Number(process.env.MOCK_BROKER_PORT ?? 4545),
   };
   for (let i = 0; i < argv.length; i += 1) {
     const value = argv[i];
@@ -266,12 +283,30 @@ function parseArgs(argv: string[]) {
     } else if (value === '--port') {
       opts.port = Number(argv[i + 1]);
       i += 1;
+    } else if (value === '--mock') {
+      opts.mock = true;
+    } else if (value === '--mock-port') {
+      opts.mockPort = Number(argv[i + 1]);
+      i += 1;
     }
   }
   if (!opts.endpoint) {
     opts.endpoint = defaultEndpoint;
   }
   return opts;
+}
+
+function getTsxBinary() {
+  const bin = process.platform === 'win32' ? 'tsx.cmd' : 'tsx';
+  return path.join(projectRoot, 'node_modules', '.bin', bin);
+}
+
+async function stopProcess(proc: ReturnType<typeof spawn> | undefined, signal: NodeJS.Signals = 'SIGINT') {
+  if (!proc) return;
+  await new Promise<void>((resolve) => {
+    proc.once('exit', () => resolve());
+    proc.kill(signal);
+  });
 }
 
 main().catch((error) => {

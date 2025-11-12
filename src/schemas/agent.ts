@@ -52,7 +52,7 @@ const baseProfileSchema = z.object({
   socials: z.array(socialLinkSchema).optional(),
   profileImage: z.string().optional(),
   uaid: z.string().optional(),
-  properties: z.record(z.any()).optional(),
+  properties: z.record(z.string(), z.any()).optional(),
   inboundTopicId: z.string().optional(),
   outboundTopicId: z.string().optional(),
   base_account: z.string().optional(),
@@ -72,7 +72,7 @@ const metadataSchema = z.object({
   category: z.string().optional(),
   adapter: z.string().optional(),
   openConvAICompatible: z.boolean().optional(),
-  customFields: z.record(z.union([z.string(), z.number(), z.boolean()])).optional(),
+  customFields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
 });
 
 export const agentRegistrationSchema: z.ZodType<AgentRegistrationRequest> = z.object({

@@ -162,9 +162,11 @@ These FastMCP tools are available everywhere the server runs (CLI, Claude Deskto
 | `hol.credits.balance` | Return API key, Hedera, and (optionally) X402 credit balances from `/credits/balance`. |
 
 #### Invoking Tools from the CLI
-- `pnpm test:tools --spawn` — boot the SSE transport on `http://localhost:3333/mcp/stream` and run every `hol.*` tool with sample payloads (set `TEST_UAID`, `TEST_CHAT_UAID`, `TEST_REGISTRATION_ATTEMPT_ID` so UAID/chat steps execute instead of skipping).
+- `pnpm test:tools` — boot the SSE transport on `http://localhost:3333/mcp/stream` and run every `hol.*` tool with sample payloads (set `TEST_UAID`, `TEST_CHAT_UAID`, `TEST_REGISTRATION_ATTEMPT_ID` so UAID/chat steps execute instead of skipping). No need to append `--spawn`; the script already starts/stops the local server.
+- `pnpm test:tools:mock` — smoke-test the CLI against the bundled mock MCP server (no registry/Broker access required). Useful for CI to verify the harness exits cleanly with code 0.
 - `pnpm test:tools --endpoint https://host/mcp/stream` — hit a remote deployment without spawning a local server; combine with `--port <n>` when using `--spawn` to change the local port.
 - Use `TEST_UAID=<uaid> TEST_CHAT_UAID=<uaid> pnpm test:tools --spawn` to pass environment variables inline; the harness reports missing vars and skips dependent tools if they are not provided.
+- Set `BROKER_PROTOCOL_TOOLS=1` if your API key has access to the `/protocols` + `/detect-protocol` endpoints; otherwise those scenarios are skipped (the staging broker currently returns 404 for those routes).
 - For ad-hoc calls, point `scripts/run-tool-suite.ts` at any MCP endpoint (`tsx scripts/run-tool-suite.ts --endpoint ...`) and edit the scenarios array to focus on a subset of tools or custom payloads.
 
 ### Workflow Environment Requirements
@@ -173,6 +175,7 @@ These FastMCP tools are available everywhere the server runs (CLI, Claude Deskto
 - `WORKFLOW_DRY_RUN=1` – skip state-changing steps (quote-only, no registration).
 - `BROKER_E2E=1` – opt in to real broker calls inside CI/e2e scripts (otherwise the mock broker is used where possible).
 - `BROKER_AUTO_TOP_UP=1` – opt in to automatic broker purchases without prompts (defaults to `0`, which enables HITL confirmation).
+- Tool-suite fixtures (optional): `TEST_UAID`, `TEST_CHAT_UAID`, `TEST_REGISTRATION_ATTEMPT_ID`, and `BROKER_PROTOCOL_TOOLS`. Populate these in `.env` (see `.env.example`) so `pnpm test:tools` can run UAID/chat flows locally and skip protocol checks unless your API key has access.
 
 Each workflow definition lists its required env vars and the pipeline runner will fail fast (before touching the broker) if any are missing. Restart the MCP server after changing credentials so FastMCP snapshots the updated environment.
 

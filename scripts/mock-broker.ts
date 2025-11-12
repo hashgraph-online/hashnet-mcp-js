@@ -17,11 +17,33 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
   const body = Buffer.concat(chunks).toString();
   const request = body ? JSON.parse(body) : {};
 
+  if (request.method === 'initialize') {
+    res
+      .writeHead(200, { 'content-type': 'application/json' })
+      .end(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          result: {
+            protocolVersion: '2024-10-07',
+            capabilities: { prompts: {}, tools: {}, resources: {} },
+            serverInfo: { name: 'mock-broker', version: '0.0.0' },
+          },
+          id: request.id ?? null,
+        }),
+      );
+    return;
+  }
+
   if (request.method === 'tools/call') {
     return handleToolCall(request, res);
   }
 
-  res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ jsonrpc: '2.0', result: {}, id: request.id ?? null }));
+  if (request.id !== undefined) {
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ jsonrpc: '2.0', result: {}, id: request.id ?? null }));
+    return;
+  }
+
+  res.writeHead(204).end();
 });
 
 server.listen(port, () => {
@@ -52,6 +74,18 @@ function handleToolCall(request: any, res: ServerResponse) {
   const result = handler ? handler(request.params?.arguments) : { note: 'mock result' };
 
   res.writeHead(200, { 'content-type': 'application/json' }).end(
-    JSON.stringify({ jsonrpc: '2.0', result: { content: [{ type: 'object', object: result }] }, id: request.id ?? null }),
+    JSON.stringify({
+      jsonrpc: '2.0',
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result),
+          },
+        ],
+        structuredContent: result,
+      },
+      id: request.id ?? null,
+    }),
   );
 }

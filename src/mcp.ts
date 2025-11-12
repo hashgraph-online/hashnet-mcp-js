@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import type {
+import {
   AgentAuthConfig,
   LedgerChallengeRequest,
   LedgerVerifyRequest,
   PurchaseCreditsWithHbarParams,
   RegistryBrokerClient,
+  RegistryBrokerError,
 } from '@hashgraphonline/standards-sdk';
 import { FastMCP } from 'fastmcp';
 import type { Context, Content } from 'fastmcp';
@@ -42,7 +43,7 @@ const agentAuthSchema: z.ZodType<AgentAuthConfig> = z
     password: z.string().optional(),
     headerName: z.string().optional(),
     headerValue: z.string().optional(),
-    headers: z.record(z.string()).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
   })
   .partial() as z.ZodType<AgentAuthConfig>;
 
@@ -300,13 +301,14 @@ export const toolDefinitions: ToolDefinition[] = [
     name: 'hol.listProtocols',
     description: 'List all registered protocols/adapters known to the broker.',
     schema: emptyObject,
-    handler: () => withBroker((client) => client.listProtocols()),
+    handler: () => runBrokerCall('hol.listProtocols', () => withBroker((client) => client.listProtocols())),
   },
   {
     name: 'hol.detectProtocol',
     description: 'Detect the expected protocol for an inbound request payload.',
     schema: detectProtocolInput,
-    handler: (input) => withBroker((client) => client.detectProtocol(input as any)),
+    handler: (input) =>
+      runBrokerCall('hol.detectProtocol', () => withBroker((client) => client.detectProtocol(input as any))),
   },
   {
     name: 'hol.stats',
@@ -355,7 +357,7 @@ export const toolDefinitions: ToolDefinition[] = [
     description: 'Fetch credit balances for the current API key and optional Hedera/X402 accounts.',
     schema: creditBalanceInput,
     handler: async (input) => {
-      const hederaAccountId = input.hederaAccountId ?? config.hederaAccountId;
+      const hederaAccountId = input.hederaAccountId;
       const [apiKeyBalance, hederaBalance, x402Balance] = await Promise.all([
         getCreditBalance(),
         hederaAccountId ? getCreditBalance(hederaAccountId) : Promise.resolve(null),
@@ -461,7 +463,7 @@ export const toolDefinitions: ToolDefinition[] = [
   },
 ];
 
-function formatPipelineResult(result: PipelineRunResult<unknown>): Content[] {
+function formatPipelineResult(result: PipelineRunResult<unknown>) {
   const summaryLines = [
     `Workflow: ${result.pipeline}`,
     result.dryRun ? '(dry-run)' : undefined,
@@ -469,10 +471,13 @@ function formatPipelineResult(result: PipelineRunResult<unknown>): Content[] {
     `Steps executed: ${result.steps.length}`,
   ].filter(Boolean) as string[];
 
-  return [
-    { type: 'text', text: summaryLines.join('\n') },
-    { type: 'object', object: result },
-  ];
+  return {
+    content: [
+      { type: 'text', text: summaryLines.join('\n') },
+      buildObjectContent('pipeline.result', result),
+    ],
+    structuredContent: result,
+  };
 }
 
 export function buildLoggedTool<S extends z.ZodTypeAny>(definition: ToolDefinition<S>) {
@@ -495,7 +500,7 @@ export function buildLoggedTool<S extends z.ZodTypeAny>(definition: ToolDefiniti
           },
           'tool.success',
         );
-        return result;
+        return normalizeResult(result);
       } catch (error) {
         logger.error(
           {
@@ -517,6 +522,73 @@ for (const definition of toolDefinitions) {
 }
 
 export const registeredTools = toolDefinitions;
+
+function isContentValue(value: unknown): value is Content {
+  return Boolean(
+    value &&
+    typeof value === 'object' &&
+    'type' in (value as Record<string, unknown>) &&
+    typeof (value as Record<string, unknown>).type === 'string',
+  );
+}
+
+function normalizeResult(value: unknown): { content: Content[]; structuredContent?: Record<string, unknown>; isError?: boolean } {
+  if (isResultShape(value)) {
+    const record = value as Record<string, unknown>;
+    return {
+      content: normalizeContent(record.content),
+      structuredContent: isPlainObject(record.structuredContent) ? (record.structuredContent as Record<string, unknown>) : undefined,
+      isError: typeof record.isError === 'boolean' ? (record.isError as boolean) : undefined,
+    };
+  }
+  return { content: normalizeContent(value) };
+}
+
+function normalizeContent(result: unknown): Content[] {
+  if (Array.isArray(result) && result.every(isContentValue)) {
+    return result;
+  }
+  if (isContentValue(result)) {
+    return [result];
+  }
+  if (result === undefined || result === null) {
+    return [{ type: 'text', text: 'ok' }];
+  }
+  if (typeof result === 'string' || typeof result === 'number' || typeof result === 'boolean') {
+    return [{ type: 'text', text: String(result) }];
+  }
+  if (isPlainObject(result)) {
+    return [buildObjectContent('tool.result', result as Record<string, unknown>)];
+  }
+  return [{ type: 'text', text: JSON.stringify(result) }];
+}
+
+function buildObjectContent(name: string, value: Record<string, unknown>): Content {
+  return {
+    type: 'text',
+    text: `${name}:\n${JSON.stringify(value, null, 2)}`,
+  };
+}
+
+function isResultShape(value: unknown): value is { content?: unknown; structuredContent?: unknown; isError?: boolean } {
+  return Boolean(value && typeof value === 'object' && ('content' in (value as Record<string, unknown>) || 'structuredContent' in (value as Record<string, unknown>)));
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+async function runBrokerCall<T>(label: string, fn: () => Promise<T>) {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof RegistryBrokerError) {
+      const body = typeof error.body === 'object' ? JSON.stringify(error.body) : String(error.body);
+      throw new Error(`${label} failed (${error.status} ${error.statusText ?? ''}): ${body}`);
+    }
+    throw error;
+  }
+}
 
 mcp.addResource({
   name: 'hol.search.help',

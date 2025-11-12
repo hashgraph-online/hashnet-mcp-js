@@ -38,6 +38,7 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:tools": "tsx scripts/run-tool-suite.ts --spawn",
+    "test:tools:mock": "tsx scripts/run-tool-suite.ts --mock",
     "workflow:list": "tsx scripts/list-workflows.ts",
     "workflow:run": "tsx scripts/run-workflow.ts",
     "workflow:register": "tsx scripts/workflow-register.ts",

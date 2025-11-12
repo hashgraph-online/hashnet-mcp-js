@@ -1,4 +1,7 @@
+import { config as loadEnv } from 'dotenv';
 import { z } from 'zod';
+
+loadEnv();
 
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace'] as const;
 

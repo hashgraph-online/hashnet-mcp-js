@@ -1,5 +1,6 @@
 import { config } from '../config';
 import { logger as baseLogger } from '../logger';
+import { ensureRequiredEnv } from './env';
 import type {
   PipelineDefinition,
   PipelineExecutionOptions,
@@ -13,6 +14,7 @@ export function createPipeline<TInput, TContext>(definition: PipelineDefinition<
   async function run(input: TInput, options?: PipelineExecutionOptions<TContext>): Promise<PipelineRunResult<TContext>> {
     const pipelineLogger = baseLogger.child({ pipeline: definition.name });
     const dryRun = options?.dryRun ?? config.workflowDryRun;
+    ensureRequiredEnv(definition.requiredEnv, { logger: pipelineLogger, context: definition.name });
     const context = await definition.createContext(input);
     const stepsResults: PipelineStepResult<unknown>[] = [];
 

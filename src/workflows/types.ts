@@ -17,6 +17,7 @@ export interface PipelineDefinition<TInput, TContext> {
   name: string;
   description: string;
   version?: string;
+  requiredEnv?: string[];
   createContext: (input: TInput) => Promise<TContext> | TContext;
   steps: PipelineStep<TInput, TContext, unknown>[];
 }

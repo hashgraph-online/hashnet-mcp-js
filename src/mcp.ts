@@ -1,12 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import type { RegistryBrokerClient } from '@hashgraphonline/standards-sdk';
 import { FastMCP } from 'fastmcp';
-import type { Content } from 'fastmcp';
-import type { Context } from 'fastmcp';
+import type { Context, Content } from 'fastmcp';
 import { z } from 'zod';
 import { withBroker } from './broker';
 import { logger } from './logger';
 import { agentRegistrationSchema } from './schemas/agent';
+import { discoveryPipeline } from './workflows/discovery';
+import { registrationPipeline } from './workflows/registration';
+import { chatPipeline } from './workflows/chat';
+import { opsPipeline } from './workflows/ops';
+import { fullWorkflowPipeline } from './workflows/combined';
+import type { PipelineRunResult } from './workflows/types';
 
 type AgentRegistrationRequest = Parameters<RegistryBrokerClient['registerAgent']>[0];
 type ChatCreateSessionPayload = Parameters<RegistryBrokerClient['chat']['createSession']>[0];
@@ -51,6 +56,28 @@ const uaidInput = z.object({ uaid: z.string().min(1) });
 
 const registrationPayload = z.object({
   payload: agentRegistrationSchema,
+});
+
+const workflowDiscoveryInput = z.object({
+  query: z.string().optional(),
+  limit: z.number().int().min(1).max(50).optional(),
+});
+
+const workflowRegistrationInput = z.object({
+  payload: agentRegistrationSchema,
+});
+
+const workflowChatInput = z.object({
+  uaid: z.string().min(1),
+  message: z.string().optional(),
+});
+
+const workflowOpsInput = z.object({});
+
+const workflowFullInput = z.object({
+  registrationPayload: agentRegistrationSchema,
+  discoveryQuery: z.string().optional(),
+  chatMessage: z.string().optional(),
 });
 
 const waitForRegistrationInput = z.object({
@@ -198,7 +225,51 @@ export const toolDefinitions: ToolDefinition[] = [
     schema: emptyObject,
     handler: () => withBroker((client) => client.dashboardStats()),
   },
+  {
+    name: 'workflow.discovery',
+    description: 'Pipeline: rb.search + rb.vectorSearch',
+    schema: workflowDiscoveryInput,
+    handler: async (input) => formatPipelineResult(await discoveryPipeline.run(input)),
+  },
+  {
+    name: 'workflow.registerMcp',
+    description: 'Pipeline: get quote, register agent, wait for completion',
+    schema: workflowRegistrationInput,
+    handler: async ({ payload }) => formatPipelineResult(await registrationPipeline.run({ payload })),
+  },
+  {
+    name: 'workflow.chatSmoke',
+    description: 'Pipeline: chat session smoke test for UAID',
+    schema: workflowChatInput,
+    handler: async (input) => formatPipelineResult(await chatPipeline.run(input)),
+  },
+  {
+    name: 'workflow.opsCheck',
+    description: 'Pipeline: stats, metrics, dashboard, protocols',
+    schema: workflowOpsInput,
+    handler: async () => formatPipelineResult(await opsPipeline.run({})),
+  },
+  {
+    name: 'workflow.fullRegistration',
+    description: 'Pipeline: discovery → register → chat → ops',
+    schema: workflowFullInput,
+    handler: async (input) => formatPipelineResult(await fullWorkflowPipeline.run(input)),
+  },
 ];
+
+function formatPipelineResult(result: PipelineRunResult<unknown>): Content[] {
+  const summaryLines = [
+    `Workflow: ${result.pipeline}`,
+    result.dryRun ? '(dry-run)' : undefined,
+    result.context?.uaid ? `UAID: ${result.context.uaid}` : undefined,
+    `Steps executed: ${result.steps.length}`,
+  ].filter(Boolean) as string[];
+
+  return [
+    { type: 'text', text: summaryLines.join('\n') },
+    { type: 'object', object: result },
+  ];
+}
 
 export function buildLoggedTool<S extends z.ZodTypeAny>(definition: ToolDefinition<S>) {
   return {
@@ -220,7 +291,7 @@ export function buildLoggedTool<S extends z.ZodTypeAny>(definition: ToolDefiniti
           },
           'tool.success',
         );
-        return coerceToContent(result);
+        return result;
       } catch (error) {
         logger.error(
           {
@@ -235,25 +306,6 @@ export function buildLoggedTool<S extends z.ZodTypeAny>(definition: ToolDefiniti
       }
     },
   };
-}
-
-function coerceToContent(result: unknown): Content[] {
-  if (Array.isArray(result) && result.every((item) => isContent(item))) {
-    return result as Content[];
-  }
-  if (typeof result === 'string') {
-    return [{ type: 'text', text: result }];
-  }
-  return [{ type: 'text', text: JSON.stringify(result, null, 2) }];
-}
-
-function isContent(value: unknown): value is Content {
-  return Boolean(
-    value &&
-    typeof value === 'object' &&
-    'type' in value &&
-    typeof (value as { type: unknown }).type === 'string',
-  );
 }
 
 for (const definition of toolDefinitions) {

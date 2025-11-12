@@ -89,6 +89,14 @@ const schemaSamples: Record<string, { valid: unknown; invalid?: unknown }> = {
   'rb.stats': { valid: {} },
   'rb.metricsSummary': { valid: {} },
   'rb.dashboardStats': { valid: {} },
+  'workflow.discovery': { valid: { query: 'hash', limit: 5 }, invalid: { limit: 0 } },
+  'workflow.registerMcp': { valid: { payload: baseRegistrationPayload }, invalid: { payload: null } },
+  'workflow.chatSmoke': { valid: { uaid: 'uaid-123', message: 'hi' }, invalid: { uaid: '' } },
+  'workflow.opsCheck': { valid: {} },
+  'workflow.fullRegistration': {
+    valid: { registrationPayload: baseRegistrationPayload, discoveryQuery: 'hashnet', chatMessage: 'hello' },
+    invalid: { registrationPayload: null },
+  },
 };
 
 describe('mcp tool definitions', () => {
@@ -134,6 +142,11 @@ describe('mcp tool definitions', () => {
       'rb.stats',
       'rb.metricsSummary',
       'rb.dashboardStats',
+      'workflow.discovery',
+      'workflow.registerMcp',
+      'workflow.chatSmoke',
+      'workflow.opsCheck',
+      'workflow.fullRegistration',
     ]);
   });
 

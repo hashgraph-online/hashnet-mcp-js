@@ -32,7 +32,6 @@
   "protocol": "mcp",
   "communicationProtocol": "sse",
   "registry": "hashgraph-online",
-  "additionalRegistries": ["agentverse"],
   "metadata": {
     "trustScore": 95,
     "verified": true,

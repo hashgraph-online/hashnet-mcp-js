@@ -1,6 +1,9 @@
+import type { AgentRegistrationRequest } from '@hashgraphonline/standards-sdk';
 import { registerPipeline } from './registry';
 import type { PipelineDefinition } from './types';
 import { withBroker } from '../broker';
+import type { CreditShortfallSummary } from './errors';
+import { runCreditAwareRegistration } from './utils/credits';
 
 interface RegistrationInput {
   payload: Record<string, unknown>;
@@ -11,24 +14,35 @@ interface RegistrationContext {
   attemptId?: string;
   result?: unknown;
   uaid?: string;
+  quote?: CreditShortfallSummary;
 }
 
 const registrationDefinition: PipelineDefinition<RegistrationInput, RegistrationContext> = {
   name: 'workflow.registerMcp',
   description: 'Quote, register, and wait for completion.',
   version: '1.0.0',
-  requiredEnv: ['REGISTRY_BROKER_API_KEY', 'HEDERA_ACCOUNT_ID', 'HEDERA_PRIVATE_KEY'],
+  requiredEnv: ['REGISTRY_BROKER_API_KEY'],
   createContext: ({ payload }) => ({ payload }),
   steps: [
     {
-      name: 'rb.getRegistrationQuote',
+      name: 'hol.getRegistrationQuote',
       allowDuringDryRun: true,
-      run: async ({ context }) => withBroker((client) => client.getRegistrationQuote(context.payload)),
+      run: async ({ context }) => {
+        const quote = await withBroker((client) => client.getRegistrationQuote(context.payload));
+        context.quote = quote;
+        return quote;
+      },
     },
     {
-      name: 'rb.registerAgent',
+      name: 'hol.registerAgent',
       run: async ({ context }) => {
-        const response = await withBroker((client) => client.registerAgent(context.payload));
+        const response = await runCreditAwareRegistration({
+          payload: context.payload as AgentRegistrationRequest,
+          onShortfall: async (err) => {
+            context.quote = err.summary;
+            return 'abort';
+          },
+        });
         if ('attemptId' in response && typeof response.attemptId === 'string') {
           context.attemptId = response.attemptId;
         }
@@ -37,7 +51,7 @@ const registrationDefinition: PipelineDefinition<RegistrationInput, Registration
       },
     },
     {
-      name: 'rb.waitForRegistrationCompletion',
+      name: 'hol.waitForRegistrationCompletion',
       run: async ({ context }) => {
         if (!context.attemptId) {
           throw new Error('Registration attemptId missing.');

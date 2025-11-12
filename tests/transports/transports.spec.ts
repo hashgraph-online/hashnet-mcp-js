@@ -9,7 +9,7 @@ vi.mock('../../src/mcp', () => ({
     stdio: stdioMock,
     start: startMock,
   },
-  registeredTools: [{ name: 'rb.search' }],
+  registeredTools: [{ name: 'hol.search' }],
 }));
 
 const createServerSpy = vi.spyOn(http, 'createServer');

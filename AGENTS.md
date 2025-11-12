@@ -12,21 +12,45 @@ The MCP server lives in `src/` with three core modules: `mcp.ts` (tool wiring an
 - `pnpm start` — executes the compiled output (`node dist/index.js`) for production parity.
 - `pnpm test --run --coverage` — executes Vitest once with V8 coverage; `pnpm test` stays in watch mode.
 - `pnpm quickstart` — interactive DX script that installs deps, copies `.env`, runs smoke tests, and launches your preferred transport (stdio or SSE).
-- `pnpm test:tools` — end-to-end harness that connects to the HTTP-stream gateway via the official MCP client (Streamable HTTP transport) and calls every `rb.*` tool using sample payloads (set `TEST_UAID`, `TEST_CHAT_UAID`, `TEST_REGISTRATION_ATTEMPT_ID` to cover UAID/chat flows).
-- `pnpm workflow:list` / `pnpm workflow:run <name>` — inspect and execute the built-in pipelines described below.
+- `pnpm test:tools` — end-to-end harness that connects to the HTTP-stream gateway via the official MCP client (Streamable HTTP transport) and calls every `hol.*` tool using sample payloads (set `TEST_UAID`, `TEST_CHAT_UAID`, `TEST_REGISTRATION_ATTEMPT_ID` to cover UAID/chat flows).
+- `pnpm workflow:list` / `pnpm workflow:run <name>` — inspect and execute any workflow (pair with `examples/workflows/<workflow>.json` for sample payloads).
 - `pnpm workflow:register` — interactive wizard that runs the registration/chat/ops workflows and saves a JSON report (UAID + Claude snippet).
-- `pnpm workflow:e2e` — runs the full workflow end-to-end when `BROKER_E2E=1` is set (skips otherwise).
+- `pnpm workflow:register:advanced` — guided prompts for `workflow.registerAgentAdvanced` (additional registries + optional credit purchase).
+- `pnpm workflow:register:erc8004` — helper around the ERC-8004 workflow (ledger walkthrough + post-registration chat).
 - `pnpm mock:broker` — local mock broker for CI/contract testing.
 - All scripts load `.env` automatically via `dotenv`, so once you copy `.env.example` you can simply edit the file and re-run commands without re-exporting variables.
 
 ## Workflows
-- `workflow.discovery` — `rb.search` + `rb.vectorSearch` (quick discovery surface)
-- `workflow.registerMcp` — `rb.getRegistrationQuote` → `rb.registerAgent` → `rb.waitForRegistrationCompletion`
-- `workflow.chatSmoke` — chat session lifecycle for a UAID
-- `workflow.opsCheck` — stats/metrics/protocol snapshot
-- `workflow.fullRegistration` — Discovery → registration → chat → ops health check
+`pnpm workflow:list` prints every registered pipeline, and each one has a golden-path payload under `examples/workflows/`. Copy the file, replace the placeholder UAIDs/API keys, then run `pnpm workflow:run <name> --payload <file>`.
 
-Each workflow emits a structured step report; run them from MCP tools or via `pnpm workflow:run`.
+**Discovery & Ops**
+- `workflow.discovery` and `workflow.erc8004Discovery` (search/vector/namespace lookups).
+- `workflow.opsCheck` (stats + metrics + protocols).
+- `workflow.registryBrokerShowcase` (discovery → analytics → optional chat).
+
+**Registration Pipelines**
+- `workflow.registerMcp`, `workflow.registerAgentAdvanced`, `workflow.registerAgentErc8004`.
+- `workflow.fullRegistration` (discovery → registration → chat → ops).
+- `workflow.erc8004X402` and `workflow.x402Registration` (registration funded via X402 with optional chat checks).
+
+**Credit & Ledger Utilities**
+- `workflow.ledgerAuth` (challenge + verify).
+- `workflow.x402TopUp` (buy credits via X402).
+- `workflow.historyTopUp` (chat compaction + HBAR auto-purchases on 402 errors).
+
+**Chat & Interop**
+- `workflow.chatSmoke` (UAID session lifecycle).
+- `workflow.openrouterChat` (discover + ping an OpenRouter model).
+- `workflow.agentverseBridge` (relay traffic between a local UAID and Agentverse).
+
+Runbook examples:
+
+```
+pnpm workflow:run workflow.registerAgentAdvanced --payload examples/workflows/workflow.registerAgentAdvanced.json
+pnpm workflow:run workflow.openrouterChat --payload examples/workflows/workflow.openrouterChat.json --endpoint https://host/mcp/stream
+```
+
+Each workflow emits a structured report (steps, timings, context) whether executed via MCP or CLI.
 
 ### Workflow Architecture
 - Pipelines live in `src/workflows/`; each file exports a `registerPipeline()` definition.
@@ -36,9 +60,12 @@ Each workflow emits a structured step report; run them from MCP tools or via `pn
 
 ### Required Environment Variables
 - `REGISTRY_BROKER_API_URL` / `REGISTRY_BROKER_API_KEY` — broker endpoint + key (staging/testnet supported).
-- `HEDERA_ACCOUNT_ID` / `HEDERA_PRIVATE_KEY` — needed for agent registration + chat workflows.
+- `HEDERA_ACCOUNT_ID` / `HEDERA_PRIVATE_KEY` — optional; only set these if you want CLI-driven credit purchases when the key runs dry.
 - `WORKFLOW_DRY_RUN=1` — optional guard that makes pipelines skip state-changing broker calls.
 - `BROKER_E2E=1` — opt into real broker hits in CI; otherwise the mock broker is used when available.
+- `BROKER_AUTO_TOP_UP=1` — opt into automatic broker purchases without HITL prompts (defaults to manual approvals).
+- X402 workflows also require EVM wallet details (see `examples/workflows/workflow.x402*.json`) plus any ledger challenge metadata referenced in the payload.
+Workflow pipelines declare their required env vars and will fail fast with a descriptive error if anything is missing; payload-specific secrets (OpenRouter tokens, Agentverse headers, bearer tokens) should be supplied via `.env` or injected by your CLI before invoking the workflow.
 
 ### Running `pnpm workflow:register`
 1. The CLI prompts for display name, alias, description, MCP URL, chat message, and report path (defaults provided).
@@ -55,18 +82,20 @@ Each workflow emits a structured step report; run them from MCP tools or via `pn
 {
   "uaid": "uaid:registry:abcd-1234",
   "pipelines": [
-    { "name": "workflow.registerMcp", "steps": ["rb.getRegistrationQuote", "rb.registerAgent"] }
+    { "name": "workflow.registerMcp", "steps": ["hol.getRegistrationQuote", "hol.registerAgent"] }
   ],
   "claudeConfig": {
     "mcpServers": {
       "hashnet": {
         "command": "npx",
-        "args": ["@hol/hashnet-mcp@latest", "up", "--transport", "sse"]
+        "args": ["@hol-org/hashnet-mcp@latest", "up", "--transport", "sse"]
       }
     }
   }
 }
 ```
+
+The CLI spends the API key’s existing credits first. If the broker rejects the registration (HTTP 402), the script fetches a fresh quote, prints the required/available credits, and prompts for HITL approval before calling `purchaseCreditsWithHbar` (when `HEDERA_*` are configured). It continues only after the broker reports the new balance. Toggle `BROKER_AUTO_TOP_UP=1` if you want the SDK’s legacy auto top-up behaviour without prompts.
 
 ### Adding / Extending Workflows
 1. Create `src/workflows/<name>.ts`, register the pipeline with metadata + env requirements, and export any helper schemas.
@@ -76,7 +105,7 @@ Each workflow emits a structured step report; run them from MCP tools or via `pn
 5. Document new workflows (README/AGENTS) and mention logging fields or env toggles to keep DX consistent.
 
 ## Coding Style & Naming Conventions
-Use TypeScript with strict mode enabled and 2-space indentation. Prefer explicit return types on exported functions, `zod` schemas for all tool inputs, and descriptive FastMCP tool IDs (`rb.search`, `rb.resolveUaid`). Filenames stay kebab-case (`hashnet-tool.ts`), while classes remain PascalCase and functions camelCase. Run `pnpm lint` (ESLint + `@typescript-eslint`) and `pnpm format` (Prettier) before pushing; both respect the repo’s `.editorconfig`.
+Use TypeScript with strict mode enabled and 2-space indentation. Prefer explicit return types on exported functions, `zod` schemas for all tool inputs, and descriptive FastMCP tool IDs (`hol.search`, `hol.resolveUaid`). Filenames stay kebab-case (`hashnet-tool.ts`), while classes remain PascalCase and functions camelCase. Run `pnpm lint` (ESLint + `@typescript-eslint`) and `pnpm format` (Prettier) before pushing; both respect the repo’s `.editorconfig`.
 
 ## Testing Guidelines
 Vitest powers unit tests, and supertest-style integration tests cover the Hono transport. Name files `*.spec.ts` for unit scope and `*.int.spec.ts` for transport flows. Mock the broker via dependency injection so tests never hit the live Registry API; only allow network calls inside smoke tests guarded by `BROKER_E2E=1`. Maintain >90% branch coverage for `src/mcp.ts` and `src/broker.ts`, since they enforce tool contracts.
@@ -97,5 +126,5 @@ Never commit `.env` or keys; ship a `.env.example` with placeholder values. Trea
 - Claude Desktop config: point to `pnpm dev:stdio` with the necessary Registry env vars; Claude Code/Cursor should target the SSE URL published by Fly/Cloud Run.
 
 ## NPX Installer
-- `npx @hol/hashnet-mcp up --transport sse` bootstraps deps, copies `.env.example`, and launches the desired transport; `--install-only` skips the final run.
+- `npx @hol-org/hashnet-mcp up --transport sse` bootstraps deps, copies `.env.example`, and launches the desired transport; `--install-only` skips the final run.
 - The CLI lives in `src/cli/up.ts` (bundled to `dist/cli/up.js`) and doubles as the package `bin` for NPX installs.

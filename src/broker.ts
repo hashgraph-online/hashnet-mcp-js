@@ -1,6 +1,7 @@
 import { RegistryBrokerClient } from '@hashgraphonline/standards-sdk';
 import Bottleneck from 'bottleneck';
 import IORedis from 'ioredis';
+import { fetch as undiciFetch } from 'undici';
 import { config } from './config';
 
 const broker = new RegistryBrokerClient({
@@ -65,3 +66,44 @@ export async function withBroker<T>(task: BrokerTask<T>): Promise<T> {
 }
 
 export { broker, brokerLimiter };
+
+export interface CreditBalanceResponse {
+  accountId: string;
+  balance: number;
+  timestamp: string;
+}
+
+export async function getCreditBalance(accountId?: string): Promise<CreditBalanceResponse> {
+  if (!config.registryBrokerApiKey) {
+    throw new Error('REGISTRY_BROKER_API_KEY is required to fetch credit balances.');
+  }
+  const url = new URL('/credits/balance', config.registryBrokerUrl);
+  if (accountId) {
+    url.searchParams.set('accountId', accountId);
+  }
+  const headers: Record<string, string> = {
+    accept: 'application/json',
+    'x-api-key': config.registryBrokerApiKey,
+  };
+  const request = async () => {
+    const response = await undiciFetch(url, { method: 'GET', headers });
+    if (!response.ok) {
+      const hint = await safeReadBody(response);
+      throw new Error(`Failed to fetch credit balance (${response.status}): ${hint ?? response.statusText}`);
+    }
+    return (await response.json()) as CreditBalanceResponse;
+  };
+  if (brokerLimiter) {
+    return brokerLimiter.schedule(request);
+  }
+  return request();
+}
+
+async function safeReadBody(response: Response) {
+  try {
+    const text = await response.text();
+    return text || undefined;
+  } catch {
+    return undefined;
+  }
+}

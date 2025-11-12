@@ -1,0 +1,14 @@
+{
+  "uaid": "uaid:registry:demo-hashnet",
+  "messages": [
+    "Hello registry broker",
+    "Can you summarize agent health?"
+  ],
+  "preserveEntries": 2,
+  "creditTopUp": {
+    "accountId": "0.0.123456",
+    "privateKey": "302e020100300506032b657004220420YOUR_HEDERA_PRIVATE_KEY",
+    "hbarAmount": 0.5,
+    "memo": "workflow.historyTopUp sample"
+  }
+}

@@ -45,39 +45,39 @@ const agentPayload = JSON.parse(
 
 const scenarios: Scenario[] = [
   {
-    tool: 'rb.search',
+    tool: 'hol.search',
     description: 'Keyword search',
     payload: () => ({ q: 'hashgraph', limit: 2 }),
   },
   {
-    tool: 'rb.vectorSearch',
+    tool: 'hol.vectorSearch',
     description: 'Vector search',
     payload: () => ({ query: 'registry broker', limit: 2 }),
   },
   {
-    tool: 'rb.resolveUaid',
+    tool: 'hol.resolveUaid',
     description: 'Resolve UAID',
     requiresEnv: ['TEST_UAID'],
     payload: () => ({ uaid: getEnv('TEST_UAID')! }),
   },
   {
-    tool: 'rb.closeUaidConnection',
+    tool: 'hol.closeUaidConnection',
     description: 'Close UAID connection',
     requiresEnv: ['TEST_UAID'],
     payload: () => ({ uaid: getEnv('TEST_UAID')! }),
   },
   {
-    tool: 'rb.getRegistrationQuote',
+    tool: 'hol.getRegistrationQuote',
     description: 'Registration quote',
     payload: () => ({ payload: agentPayload }),
   },
   {
-    tool: 'rb.registerAgent',
+    tool: 'hol.registerAgent',
     description: 'Register agent (dry run)',
     payload: () => ({ payload: agentPayload }),
   },
   {
-    tool: 'rb.waitForRegistrationCompletion',
+    tool: 'hol.waitForRegistrationCompletion',
     description: 'Wait for registration attempt',
     requiresEnv: ['TEST_REGISTRATION_ATTEMPT_ID'],
     payload: () => ({
@@ -87,7 +87,7 @@ const scenarios: Scenario[] = [
     }),
   },
   {
-    tool: 'rb.chat.createSession',
+    tool: 'hol.chat.createSession',
     description: 'Create chat session',
     requiresEnv: ['TEST_CHAT_UAID'],
     payload: () => ({ uaid: getEnv('TEST_CHAT_UAID')!, historyTtlSeconds: 60 }),
@@ -96,57 +96,73 @@ const scenarios: Scenario[] = [
     },
   },
   {
-    tool: 'rb.chat.sendMessage',
+    tool: 'hol.chat.sendMessage',
     description: 'Send chat message',
     requiresEnv: ['TEST_CHAT_UAID'],
     needsContext: (ctx) => Boolean(ctx.chatSessionId),
     payload: (ctx) => ({ sessionId: ctx.chatSessionId!, message: 'ping' }),
   },
   {
-    tool: 'rb.chat.history',
+    tool: 'hol.chat.history',
     description: 'Chat history',
     requiresEnv: ['TEST_CHAT_UAID'],
     needsContext: (ctx) => Boolean(ctx.chatSessionId),
     payload: (ctx) => ({ sessionId: ctx.chatSessionId! }),
   },
   {
-    tool: 'rb.chat.compact',
+    tool: 'hol.chat.compact',
     description: 'Compact chat history',
     requiresEnv: ['TEST_CHAT_UAID'],
     needsContext: (ctx) => Boolean(ctx.chatSessionId),
     payload: (ctx) => ({ sessionId: ctx.chatSessionId!, preserveEntries: 2 }),
   },
   {
-    tool: 'rb.chat.end',
+    tool: 'hol.chat.end',
     description: 'End chat session',
     requiresEnv: ['TEST_CHAT_UAID'],
     needsContext: (ctx) => Boolean(ctx.chatSessionId),
     payload: (ctx) => ({ sessionId: ctx.chatSessionId! }),
   },
   {
-    tool: 'rb.listProtocols',
+    tool: 'hol.listProtocols',
     description: 'List protocols',
     payload: () => ({}),
   },
   {
-    tool: 'rb.detectProtocol',
+    tool: 'hol.detectProtocol',
     description: 'Detect protocol',
     payload: () => ({ headers: { 'content-type': 'application/json' }, body: '{}' }),
   },
   {
-    tool: 'rb.stats',
+    tool: 'hol.stats',
     description: 'Broker stats',
     payload: () => ({}),
   },
   {
-    tool: 'rb.metricsSummary',
+    tool: 'hol.metricsSummary',
     description: 'Metrics summary',
     payload: () => ({}),
   },
   {
-    tool: 'rb.dashboardStats',
+    tool: 'hol.dashboardStats',
     description: 'Dashboard stats',
     payload: () => ({}),
+  },
+  {
+    tool: 'hol.credits.balance',
+    description: 'Credit balances (API key + optional Hedera/X402 accounts)',
+    payload: () => {
+      const payload: Record<string, string> = {};
+      const hederaAccount = getEnv('HEDERA_ACCOUNT_ID');
+      const x402Account = getEnv('X402_ACCOUNT_ID');
+      if (hederaAccount) {
+        payload.hederaAccountId = hederaAccount;
+      }
+      if (x402Account) {
+        payload.x402AccountId = x402Account;
+      }
+      return payload;
+    },
   },
 ];
 

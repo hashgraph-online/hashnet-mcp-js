@@ -43,7 +43,7 @@ try {
 }
 
 function printHelp() {
-  console.log(`Usage: npx @hol/hashnet-mcp up [options]\n\nOptions:\n  --transport <stdio|sse>  Choose the transport to start (default: stdio)\n  --install-only          Install deps and sync .env, then exit\n  -h, --help              Show this help message`);
+  console.log(`Usage: npx @hol-org/hashnet-mcp up [options]\n\nOptions:\n  --transport <stdio|sse>  Choose the transport to start (default: stdio)\n  --install-only          Install deps and sync .env, then exit\n  -h, --help              Show this help message`);
 }
 
 function parseFlags(values: string[]) {

@@ -1,0 +1,6 @@
+{
+  "query": "hashgraph",
+  "uaid": "uaid:registry:demo-hashnet",
+  "message": "Confirm readiness?",
+  "performCreditCheck": false
+}

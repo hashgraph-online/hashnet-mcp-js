@@ -20,7 +20,7 @@ const opsDefinition: PipelineDefinition<OpsInput, OpsContext> = {
   createContext: () => ({}),
   steps: [
     {
-      name: 'rb.stats',
+      name: 'hol.stats',
       allowDuringDryRun: true,
       run: async ({ context }) => {
         const response = await withBroker((client) => client.stats());
@@ -29,7 +29,7 @@ const opsDefinition: PipelineDefinition<OpsInput, OpsContext> = {
       },
     },
     {
-      name: 'rb.metricsSummary',
+      name: 'hol.metricsSummary',
       allowDuringDryRun: true,
       run: async ({ context }) => {
         const response = await withBroker((client) => client.metricsSummary());
@@ -38,7 +38,7 @@ const opsDefinition: PipelineDefinition<OpsInput, OpsContext> = {
       },
     },
     {
-      name: 'rb.dashboardStats',
+      name: 'hol.dashboardStats',
       allowDuringDryRun: true,
       run: async ({ context }) => {
         const response = await withBroker((client) => client.dashboardStats());
@@ -47,12 +47,12 @@ const opsDefinition: PipelineDefinition<OpsInput, OpsContext> = {
       },
     },
     {
-      name: 'rb.listProtocols',
+      name: 'hol.listProtocols',
       allowDuringDryRun: true,
       run: async () => withBroker((client) => client.listProtocols()),
     },
     {
-      name: 'rb.detectProtocol',
+      name: 'hol.detectProtocol',
       allowDuringDryRun: true,
       run: async () =>
         withBroker((client) =>

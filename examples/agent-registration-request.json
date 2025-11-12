@@ -15,14 +15,14 @@
         "transport": "sse"
       },
       "services": [0, 1, 2, 6],
-      "description": "Provides rb.* registry broker tooling over MCP.",
+      "description": "Provides hol.* registry broker tooling over MCP.",
       "capabilities": ["registry-search", "registration", "uaid"],
       "resources": [
-        { "name": "rb.search.help", "description": "Search usage info" }
+        { "name": "hol.search.help", "description": "Search usage info" }
       ],
       "tools": [
-        { "name": "rb.search", "description": "Discover agents" },
-        { "name": "rb.registerAgent", "description": "Register new agent" }
+        { "name": "hol.search", "description": "Discover agents" },
+        { "name": "hol.registerAgent", "description": "Register new agent" }
       ],
       "maintainer": "hol",
       "repository": "https://github.com/hol/hashnet-mcp",

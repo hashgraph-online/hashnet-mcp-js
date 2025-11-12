@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
+process.env.REGISTRY_BROKER_API_KEY = process.env.REGISTRY_BROKER_API_KEY ?? 'test-api-key';
+process.env.HEDERA_ACCOUNT_ID = process.env.HEDERA_ACCOUNT_ID ?? '0.0.1234';
+process.env.HEDERA_PRIVATE_KEY =
+  process.env.HEDERA_PRIVATE_KEY ?? '302e020100300506032b657004220420aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
 const createFakeClient = () => ({
   search: vi.fn().mockResolvedValue('search-result'),
   vectorSearch: vi.fn().mockResolvedValue('vector-result'),
@@ -11,6 +16,9 @@ const createFakeClient = () => ({
   getRegistrationQuote: vi.fn().mockResolvedValue('quote'),
   registerAgent: vi.fn().mockResolvedValue('registered'),
   waitForRegistrationCompletion: vi.fn().mockResolvedValue('complete'),
+  updateAgent: vi.fn().mockResolvedValue('updated'),
+  getAdditionalRegistries: vi.fn().mockResolvedValue({ registries: [] }),
+  registrySearchByNamespace: vi.fn().mockResolvedValue({ hits: [] }),
   chat: {
     createSession: vi.fn().mockResolvedValue({ sessionId: 'session-1' }),
     sendMessage: vi.fn().mockResolvedValue({ message: 'ok' }),
@@ -23,9 +31,20 @@ const createFakeClient = () => ({
   stats: vi.fn().mockResolvedValue({ total: 10 }),
   metricsSummary: vi.fn().mockResolvedValue({ latencyP50: 10 }),
   dashboardStats: vi.fn().mockResolvedValue({ active: 5 }),
+  websocketStats: vi.fn().mockResolvedValue({ connections: 1 }),
+  createLedgerChallenge: vi.fn().mockResolvedValue({ challengeId: 'c1', message: 'sign-me' }),
+  verifyLedgerChallenge: vi.fn().mockResolvedValue({ key: 'ledger-key' }),
+  purchaseCreditsWithHbar: vi.fn().mockResolvedValue({ credits: 100 }),
+  getX402Minimums: vi.fn().mockResolvedValue({ minimums: {} }),
+  buyCreditsWithX402: vi.fn().mockResolvedValue({ creditedCredits: 100 }),
 });
 
 const fakeClient = createFakeClient();
+const getCreditBalanceMock = vi.fn().mockResolvedValue({
+  accountId: '0.0.123',
+  balance: 500,
+  timestamp: new Date().toISOString(),
+});
 const withBrokerMock = vi.fn((fn: (client: typeof fakeClient) => Promise<unknown>) => fn(fakeClient));
 
 const loggerSpy = {
@@ -38,6 +57,7 @@ vi.mock('../../src/broker', () => ({
   withBroker: withBrokerMock,
   broker: fakeClient,
   brokerLimiter: undefined,
+  getCreditBalance: getCreditBalanceMock,
 }));
 
 vi.mock('../../src/logger', () => ({
@@ -69,26 +89,48 @@ const baseRegistrationPayload = {
 };
 
 const schemaSamples: Record<string, { valid: unknown; invalid?: unknown }> = {
-  'rb.search': { valid: { q: 'agent', limit: 5 }, invalid: { limit: 0 } },
-  'rb.vectorSearch': { valid: { query: 'embedding' }, invalid: { query: '' } },
-  'rb.resolveUaid': { valid: { uaid: 'uaid-1' }, invalid: { uaid: '' } },
-  'rb.closeUaidConnection': { valid: { uaid: 'uaid-1' }, invalid: { uaid: '' } },
-  'rb.getRegistrationQuote': { valid: { payload: baseRegistrationPayload }, invalid: { payload: null } },
-  'rb.registerAgent': { valid: { payload: baseRegistrationPayload }, invalid: { payload: undefined } },
-  'rb.waitForRegistrationCompletion': {
+  'hol.search': { valid: { q: 'agent', limit: 5 }, invalid: { limit: 0 } },
+  'hol.vectorSearch': { valid: { query: 'embedding' }, invalid: { query: '' } },
+  'hol.resolveUaid': { valid: { uaid: 'uaid-1' }, invalid: { uaid: '' } },
+  'hol.closeUaidConnection': { valid: { uaid: 'uaid-1' }, invalid: { uaid: '' } },
+  'hol.getRegistrationQuote': { valid: { payload: baseRegistrationPayload }, invalid: { payload: null } },
+  'hol.registerAgent': { valid: { payload: baseRegistrationPayload }, invalid: { payload: undefined } },
+  'hol.waitForRegistrationCompletion': {
     valid: { attemptId: 'attempt', intervalMs: 1000, timeoutMs: 2000 },
     invalid: { attemptId: 'attempt', intervalMs: 0, timeoutMs: 0 },
   },
-  'rb.chat.createSession': { valid: { uaid: 'uaid', historyTtlSeconds: 60 }, invalid: { uaid: '' } },
-  'rb.chat.sendMessage': { valid: { sessionId: 's1', message: 'hello' }, invalid: { sessionId: 's1', message: '' } },
-  'rb.chat.history': { valid: { sessionId: 's1' }, invalid: {} },
-  'rb.chat.compact': { valid: { sessionId: 's1', preserveEntries: 2 }, invalid: { sessionId: 's1', preserveEntries: -1 } },
-  'rb.chat.end': { valid: { sessionId: 's1' }, invalid: {} },
-  'rb.listProtocols': { valid: {} },
-  'rb.detectProtocol': { valid: { headers: { 'content-type': 'application/json' }, body: '{}' }, invalid: { headers: { foo: 1 } } },
-  'rb.stats': { valid: {} },
-  'rb.metricsSummary': { valid: {} },
-  'rb.dashboardStats': { valid: {} },
+  'hol.updateAgent': { valid: { uaid: 'uaid-1', payload: baseRegistrationPayload }, invalid: { uaid: '', payload: baseRegistrationPayload } },
+  'hol.additionalRegistries': { valid: {} },
+  'hol.registrySearchByNamespace': { valid: { registry: 'hashnet', query: 'mcp' }, invalid: { registry: '' } },
+  'hol.chat.createSession': { valid: { uaid: 'uaid', historyTtlSeconds: 60 }, invalid: { uaid: '' } },
+  'hol.chat.sendMessage': { valid: { sessionId: 's1', message: 'hello' }, invalid: { sessionId: 's1', message: '' } },
+  'hol.chat.history': { valid: { sessionId: 's1' }, invalid: {} },
+  'hol.chat.compact': { valid: { sessionId: 's1', preserveEntries: 2 }, invalid: { sessionId: 's1', preserveEntries: -1 } },
+  'hol.chat.end': { valid: { sessionId: 's1' }, invalid: {} },
+  'hol.listProtocols': { valid: {} },
+  'hol.detectProtocol': { valid: { headers: { 'content-type': 'application/json' }, body: '{}' }, invalid: { headers: { foo: 1 } } },
+  'hol.stats': { valid: {} },
+  'hol.metricsSummary': { valid: {} },
+  'hol.dashboardStats': { valid: {} },
+  'hol.websocketStats': { valid: {} },
+  'hol.ledger.challenge': { valid: { accountId: '0.0.123', network: 'mainnet' }, invalid: { accountId: '', network: 'foo' } },
+  'hol.ledger.authenticate': {
+    valid: { challengeId: 'c1', accountId: '0.0.123', network: 'testnet', signature: '0xabc' },
+    invalid: { challengeId: '', accountId: '', network: 'foo', signature: '' },
+  },
+  'hol.purchaseCredits.hbar': {
+    valid: { accountId: '0.0.123', privateKey: 'key', hbarAmount: 1.5 },
+    invalid: { accountId: '', privateKey: 'key', hbarAmount: 0 },
+  },
+  'hol.credits.balance': {
+    valid: { hederaAccountId: '0.0.123', x402AccountId: 'evm:0xabc' },
+    invalid: { hederaAccountId: '' },
+  },
+  'hol.x402.minimums': { valid: {} },
+  'hol.x402.buyCredits': {
+    valid: { accountId: '0.0.123', credits: 10, evmPrivateKey: '0xabc' },
+    invalid: { accountId: '', credits: 0, evmPrivateKey: '' },
+  },
   'workflow.discovery': { valid: { query: 'hash', limit: 5 }, invalid: { limit: 0 } },
   'workflow.registerMcp': { valid: { payload: baseRegistrationPayload }, invalid: { payload: null } },
   'workflow.chatSmoke': { valid: { uaid: 'uaid-123', message: 'hi' }, invalid: { uaid: '' } },
@@ -102,6 +144,7 @@ const schemaSamples: Record<string, { valid: unknown; invalid?: unknown }> = {
 describe('mcp tool definitions', () => {
   beforeEach(() => {
     withBrokerMock.mockClear();
+    getCreditBalanceMock.mockClear();
     fakeClient.search.mockClear();
     fakeClient.vectorSearch.mockClear();
     fakeClient.resolveUaid.mockClear();
@@ -111,6 +154,9 @@ describe('mcp tool definitions', () => {
     fakeClient.getRegistrationQuote.mockClear();
     fakeClient.registerAgent.mockClear();
     fakeClient.waitForRegistrationCompletion.mockClear();
+    fakeClient.updateAgent.mockClear();
+    fakeClient.getAdditionalRegistries.mockClear();
+    fakeClient.registrySearchByNamespace.mockClear();
     fakeClient.chat.createSession.mockClear();
     fakeClient.chat.sendMessage.mockClear();
     fakeClient.chat.getHistory.mockClear();
@@ -121,31 +167,53 @@ describe('mcp tool definitions', () => {
     fakeClient.stats.mockClear();
     fakeClient.metricsSummary.mockClear();
     fakeClient.dashboardStats.mockClear();
+    fakeClient.websocketStats.mockClear();
+    fakeClient.createLedgerChallenge.mockClear();
+    fakeClient.verifyLedgerChallenge.mockClear();
+    fakeClient.purchaseCreditsWithHbar.mockClear();
+    fakeClient.getX402Minimums.mockClear();
+    fakeClient.buyCreditsWithX402.mockClear();
   });
 
   it('registers all expected tool names', () => {
     expect(registeredTools.map((tool) => tool.name)).toEqual([
-      'rb.search',
-      'rb.vectorSearch',
-      'rb.resolveUaid',
-      'rb.closeUaidConnection',
-      'rb.getRegistrationQuote',
-      'rb.registerAgent',
-      'rb.waitForRegistrationCompletion',
-      'rb.chat.createSession',
-      'rb.chat.sendMessage',
-      'rb.chat.history',
-      'rb.chat.compact',
-      'rb.chat.end',
-      'rb.listProtocols',
-      'rb.detectProtocol',
-      'rb.stats',
-      'rb.metricsSummary',
-      'rb.dashboardStats',
+      'hol.search',
+      'hol.vectorSearch',
+      'hol.resolveUaid',
+      'hol.closeUaidConnection',
+      'hol.getRegistrationQuote',
+      'hol.registerAgent',
+      'hol.waitForRegistrationCompletion',
+      'hol.updateAgent',
+      'hol.additionalRegistries',
+      'hol.registrySearchByNamespace',
+      'hol.chat.createSession',
+      'hol.chat.sendMessage',
+      'hol.chat.history',
+      'hol.chat.compact',
+      'hol.chat.end',
+      'hol.listProtocols',
+      'hol.detectProtocol',
+      'hol.stats',
+      'hol.metricsSummary',
+      'hol.dashboardStats',
+      'hol.websocketStats',
+      'hol.ledger.challenge',
+      'hol.ledger.authenticate',
+      'hol.purchaseCredits.hbar',
+      'hol.credits.balance',
+      'hol.x402.minimums',
+      'hol.x402.buyCredits',
       'workflow.discovery',
       'workflow.registerMcp',
       'workflow.chatSmoke',
       'workflow.opsCheck',
+      'workflow.openrouterChat',
+      'workflow.registryBrokerShowcase',
+      'workflow.agentverseBridge',
+      'workflow.erc8004Discovery',
+      'workflow.erc8004X402',
+      'workflow.x402Registration',
       'workflow.fullRegistration',
     ]);
   });
@@ -158,9 +226,9 @@ describe('mcp tool definitions', () => {
     }
   });
 
-  it('delegates rb.search to client.search', async () => {
-    const tool = getTool('rb.search');
-    const payload = schemaSamples['rb.search'].valid;
+  it('delegates hol.search to client.search', async () => {
+    const tool = getTool('hol.search');
+    const payload = schemaSamples['hol.search'].valid;
     const result = await tool.handler(payload as any);
     expect(fakeClient.search).toHaveBeenCalledWith(payload);
     expect(result).toBe('search-result');
@@ -170,7 +238,7 @@ describe('mcp tool definitions', () => {
     fakeClient.resolveUaid.mockResolvedValueOnce('resolved-value');
     fakeClient.validateUaid.mockResolvedValueOnce('validated-value');
     fakeClient.getUaidConnectionStatus.mockResolvedValueOnce('status-value');
-    const tool = getTool('rb.resolveUaid');
+    const tool = getTool('hol.resolveUaid');
     const response = await tool.handler({ uaid: 'abc' });
     expect(response).toEqual({
       resolved: 'resolved-value',
@@ -181,7 +249,7 @@ describe('mcp tool definitions', () => {
   });
 
   it('waits for registration completion using broker helper', async () => {
-    const tool = getTool('rb.waitForRegistrationCompletion');
+    const tool = getTool('hol.waitForRegistrationCompletion');
     await tool.handler({ attemptId: 'attempt', intervalMs: 500, timeoutMs: 1_000 });
     expect(fakeClient.waitForRegistrationCompletion).toHaveBeenCalledWith('attempt', {
       intervalMs: 500,
@@ -190,39 +258,68 @@ describe('mcp tool definitions', () => {
   });
 
   it('routes chat operations through the broker chat namespace', async () => {
-    const createTool = getTool('rb.chat.createSession');
+    const createTool = getTool('hol.chat.createSession');
     await createTool.handler({ uaid: 'uaid', historyTtlSeconds: 60 });
     expect(fakeClient.chat.createSession).toHaveBeenCalledWith({ uaid: 'uaid', historyTtlSeconds: 60 });
 
-    const messageTool = getTool('rb.chat.sendMessage');
+    const messageTool = getTool('hol.chat.sendMessage');
     await messageTool.handler({ sessionId: 's', message: 'hi' });
     expect(fakeClient.chat.sendMessage).toHaveBeenCalledWith({ sessionId: 's', message: 'hi' });
 
-    const historyTool = getTool('rb.chat.history');
+    const historyTool = getTool('hol.chat.history');
     await historyTool.handler({ sessionId: 's' });
     expect(fakeClient.chat.getHistory).toHaveBeenCalledWith('s');
 
-    const compactTool = getTool('rb.chat.compact');
+    const compactTool = getTool('hol.chat.compact');
     await compactTool.handler({ sessionId: 's', preserveEntries: 3 });
     expect(fakeClient.chat.compactHistory).toHaveBeenCalledWith({ sessionId: 's', preserveEntries: 3 });
 
-    const endTool = getTool('rb.chat.end');
+    const endTool = getTool('hol.chat.end');
     await endTool.handler({ sessionId: 's' });
     expect(fakeClient.chat.endSession).toHaveBeenCalledWith('s');
   });
 
   it('exposes read-only protocol and stats utilities', async () => {
-    await getTool('rb.listProtocols').handler({});
-    await getTool('rb.detectProtocol').handler({ headers: { foo: 'bar' } });
-    await getTool('rb.stats').handler({});
-    await getTool('rb.metricsSummary').handler({});
-    await getTool('rb.dashboardStats').handler({});
+    await getTool('hol.listProtocols').handler({});
+    await getTool('hol.detectProtocol').handler({ headers: { foo: 'bar' } });
+    await getTool('hol.stats').handler({});
+    await getTool('hol.metricsSummary').handler({});
+    await getTool('hol.dashboardStats').handler({});
+    await getTool('hol.websocketStats').handler({});
 
     expect(fakeClient.listProtocols).toHaveBeenCalled();
     expect(fakeClient.detectProtocol).toHaveBeenCalledWith({ headers: { foo: 'bar' } });
     expect(fakeClient.stats).toHaveBeenCalled();
     expect(fakeClient.metricsSummary).toHaveBeenCalled();
     expect(fakeClient.dashboardStats).toHaveBeenCalled();
+    expect(fakeClient.websocketStats).toHaveBeenCalled();
+  });
+
+  it('supports registry maintenance helpers', async () => {
+    await getTool('hol.updateAgent').handler({ uaid: 'uaid', payload: baseRegistrationPayload });
+    expect(fakeClient.updateAgent).toHaveBeenCalled();
+    await getTool('hol.additionalRegistries').handler({});
+    expect(fakeClient.getAdditionalRegistries).toHaveBeenCalled();
+    await getTool('hol.registrySearchByNamespace').handler({ registry: 'hashnet', query: 'foo' });
+    expect(fakeClient.registrySearchByNamespace).toHaveBeenCalledWith('hashnet', 'foo');
+  });
+
+  it('handles ledger + credit purchase helpers', async () => {
+    await getTool('hol.ledger.challenge').handler({ accountId: '0.0.1', network: 'mainnet' });
+    expect(fakeClient.createLedgerChallenge).toHaveBeenCalled();
+    await getTool('hol.ledger.authenticate').handler({
+      challengeId: 'c1',
+      accountId: '0.0.1',
+      network: 'testnet',
+      signature: '0xabc',
+    });
+    expect(fakeClient.verifyLedgerChallenge).toHaveBeenCalled();
+    await getTool('hol.purchaseCredits.hbar').handler({ accountId: '0.0.1', privateKey: 'key', hbarAmount: 1 });
+    expect(fakeClient.purchaseCreditsWithHbar).toHaveBeenCalled();
+    await getTool('hol.x402.minimums').handler({});
+    expect(fakeClient.getX402Minimums).toHaveBeenCalled();
+    await getTool('hol.x402.buyCredits').handler({ accountId: '0.0.1', credits: 5, evmPrivateKey: '0xabc' });
+    expect(fakeClient.buyCreditsWithX402).toHaveBeenCalled();
   });
 });
 

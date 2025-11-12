@@ -1,0 +1,7 @@
+{
+  "modelId": "openrouter/anthropic/claude-3.5-sonnet",
+  "registry": "openrouter",
+  "message": "Give me a two sentence summary of Hashgraph Online",
+  "authToken": "OPENROUTER_API_KEY",
+  "historyTtlSeconds": 300
+}

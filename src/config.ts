@@ -1,7 +1,9 @@
 import { config as loadEnv } from 'dotenv';
 import { z } from 'zod';
 
-loadEnv();
+if (process.env.NODE_ENV !== 'test') {
+  loadEnv();
+}
 
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace'] as const;
 
@@ -26,6 +28,10 @@ const envSchema = z
       .enum(['0', '1'])
       .optional()
       .transform((value) => value === '1'),
+    BROKER_AUTO_TOP_UP: z
+      .enum(['0', '1'])
+      .optional()
+      .transform((value) => value === '1'),
   })
   .superRefine((val, ctx) => {
     const hasAccount = Boolean(val.HEDERA_ACCOUNT_ID);
@@ -38,20 +44,27 @@ const envSchema = z
     }
   });
 
+const normalized = (value?: string) => {
+  if (value === undefined) return undefined;
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? undefined : trimmed;
+};
+
 const parsed = envSchema.safeParse({
-  REGISTRY_BROKER_API_URL: process.env.REGISTRY_BROKER_API_URL,
-  REGISTRY_BROKER_API_KEY: process.env.REGISTRY_BROKER_API_KEY,
-  HEDERA_ACCOUNT_ID: process.env.HEDERA_ACCOUNT_ID,
-  HEDERA_PRIVATE_KEY: process.env.HEDERA_PRIVATE_KEY,
-  PORT: process.env.PORT,
-  BROKER_MAX_CONCURRENT: process.env.BROKER_MAX_CONCURRENT,
-  BROKER_MIN_TIME_MS: process.env.BROKER_MIN_TIME_MS,
-  BROKER_RESERVOIR: process.env.BROKER_RESERVOIR,
-  BROKER_RESERVOIR_REFRESH_INTERVAL_MS: process.env.BROKER_RESERVOIR_REFRESH_INTERVAL_MS,
-  BROKER_RESERVOIR_REFRESH_AMOUNT: process.env.BROKER_RESERVOIR_REFRESH_AMOUNT,
-  BROKER_RATE_LIMIT_REDIS_URL: process.env.BROKER_RATE_LIMIT_REDIS_URL,
-  LOG_LEVEL: process.env.LOG_LEVEL,
-  WORKFLOW_DRY_RUN: process.env.WORKFLOW_DRY_RUN,
+  REGISTRY_BROKER_API_URL: normalized(process.env.REGISTRY_BROKER_API_URL),
+  REGISTRY_BROKER_API_KEY: normalized(process.env.REGISTRY_BROKER_API_KEY),
+  HEDERA_ACCOUNT_ID: normalized(process.env.HEDERA_ACCOUNT_ID),
+  HEDERA_PRIVATE_KEY: normalized(process.env.HEDERA_PRIVATE_KEY),
+  PORT: normalized(process.env.PORT),
+  BROKER_MAX_CONCURRENT: normalized(process.env.BROKER_MAX_CONCURRENT),
+  BROKER_MIN_TIME_MS: normalized(process.env.BROKER_MIN_TIME_MS),
+  BROKER_RESERVOIR: normalized(process.env.BROKER_RESERVOIR),
+  BROKER_RESERVOIR_REFRESH_INTERVAL_MS: normalized(process.env.BROKER_RESERVOIR_REFRESH_INTERVAL_MS),
+  BROKER_RESERVOIR_REFRESH_AMOUNT: normalized(process.env.BROKER_RESERVOIR_REFRESH_AMOUNT),
+  BROKER_RATE_LIMIT_REDIS_URL: normalized(process.env.BROKER_RATE_LIMIT_REDIS_URL),
+  LOG_LEVEL: normalized(process.env.LOG_LEVEL),
+  WORKFLOW_DRY_RUN: normalized(process.env.WORKFLOW_DRY_RUN),
+  BROKER_AUTO_TOP_UP: normalized(process.env.BROKER_AUTO_TOP_UP),
 });
 
 if (!parsed.success) {
@@ -64,7 +77,8 @@ export const config = {
   hederaAccountId: parsed.data.HEDERA_ACCOUNT_ID,
   hederaPrivateKey: parsed.data.HEDERA_PRIVATE_KEY,
   port: parsed.data.PORT,
-  autoTopUpEnabled: Boolean(parsed.data.HEDERA_ACCOUNT_ID && parsed.data.HEDERA_PRIVATE_KEY),
+  autoTopUpEnabled:
+    Boolean(parsed.data.BROKER_AUTO_TOP_UP) && Boolean(parsed.data.HEDERA_ACCOUNT_ID && parsed.data.HEDERA_PRIVATE_KEY),
   rateLimit: (() => {
     const {
       BROKER_MAX_CONCURRENT,

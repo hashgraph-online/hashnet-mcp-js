@@ -4,10 +4,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
+import type { CreditPurchaseResponse } from '@hashgraphonline/standards-sdk';
 import { registrationPipeline } from '../src/workflows/registration';
 import { chatPipeline } from '../src/workflows/chat';
 import { opsPipeline } from '../src/workflows/ops';
 import { assertEnvVars } from '../src/workflows/env';
+import { isInsufficientCreditsError } from '../src/workflows/errors';
+import type { CreditShortfallSummary } from '../src/workflows/errors';
+import { config as appConfig } from '../src/config';
+import { withBroker } from '../src/broker';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
@@ -50,7 +55,7 @@ async function main() {
   };
 
   try {
-    const registrationResult = await registrationPipeline.run({ payload: basePayload });
+    const registrationResult = await runRegistrationWithCredits(basePayload);
     report.steps.push({ name: 'workflow.registerMcp', status: 'ok' });
     report.uaid = registrationResult.context.uaid ?? null;
 
@@ -77,7 +82,7 @@ async function main() {
   }
 }
 
-const REQUIRED_CLI_ENV = ['REGISTRY_BROKER_API_KEY', 'HEDERA_ACCOUNT_ID', 'HEDERA_PRIVATE_KEY'];
+const REQUIRED_CLI_ENV = ['REGISTRY_BROKER_API_KEY'];
 
 function ensureCliEnv() {
   try {
@@ -162,3 +167,120 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+
+async function runRegistrationWithCredits(payload: Record<string, unknown>) {
+  while (true) {
+    try {
+      return await registrationPipeline.run({ payload });
+    } catch (error) {
+      if (isInsufficientCreditsError(error)) {
+        await handleCreditShortfall(error.summary, payload);
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
+async function handleCreditShortfall(summary: CreditShortfallSummary, payload: Record<string, unknown>) {
+  console.error('\nInsufficient registry credits detected.');
+  console.error(
+    `Required: ${summary.requiredCredits} • Available: ${summary.availableCredits} • Shortfall: ${summary.shortfallCredits}`,
+  );
+  if (!appConfig.hederaAccountId || !appConfig.hederaPrivateKey) {
+    throw new Error(
+      'Registry credits are insufficient and no Hedera wallet is configured. Top up credits via the dashboard or set HEDERA_ACCOUNT_ID/HEDERA_PRIVATE_KEY to enable automatic purchases.',
+    );
+  }
+  const plan = calculatePurchasePlan(summary);
+  const consent = await promptYesNo(
+    `Purchase ~${plan.hbarAmount} ℏ worth of credits from account ${appConfig.hederaAccountId}? (y/N): `,
+  );
+  if (!consent) {
+    throw new Error('Registration aborted: credits insufficient and purchase declined.');
+  }
+  const receipt = await purchaseCredits(plan, summary);
+  console.log(
+    `Purchased ${receipt.credits} credits for ${receipt.hbarAmount} ℏ (tx ${receipt.transactionId}). Waiting for settlement...`,
+  );
+  await waitForCreditsToSettle(payload);
+  console.log('Credits confirmed. Continuing registration.\n');
+}
+
+interface PurchasePlan {
+  creditsNeeded: number;
+  hbarAmount: number;
+}
+
+function calculatePurchasePlan(summary: CreditShortfallSummary): PurchasePlan {
+  const creditsNeeded = Math.max(1, Math.ceil(summary.shortfallCredits));
+  const creditsPerHbar = summary.creditsPerHbar ?? null;
+  let hbarAmount: number | null = null;
+  if (creditsPerHbar && creditsPerHbar > 0) {
+    hbarAmount = calculateHbarAmount(creditsNeeded, creditsPerHbar);
+  } else if (summary.estimatedHbar && summary.estimatedHbar > 0) {
+    hbarAmount = summary.estimatedHbar;
+  }
+  if (!hbarAmount) {
+    throw new Error('Broker quote did not include pricing info to purchase credits automatically.');
+  }
+  return { creditsNeeded, hbarAmount };
+}
+
+function calculateHbarAmount(creditsToPurchase: number, creditsPerHbar: number): number {
+  if (creditsPerHbar <= 0) {
+    throw new Error('creditsPerHbar must be positive to request a purchase.');
+  }
+  const tinybars = Math.ceil((creditsToPurchase / creditsPerHbar) * 1e8);
+  if (tinybars <= 0) {
+    throw new Error('Calculated HBAR amount is invalid.');
+  }
+  return tinybars / 1e8;
+}
+
+async function purchaseCredits(plan: PurchasePlan, summary: CreditShortfallSummary): Promise<CreditPurchaseResponse> {
+  if (!appConfig.hederaAccountId || !appConfig.hederaPrivateKey) {
+    throw new Error('Hedera credentials missing; cannot purchase credits automatically.');
+  }
+  return withBroker((client) =>
+    client.purchaseCreditsWithHbar({
+      accountId: appConfig.hederaAccountId,
+      privateKey: appConfig.hederaPrivateKey,
+      hbarAmount: plan.hbarAmount,
+      memo: 'hashnet-mcp workflow register top-up',
+      metadata: {
+        requestedCredits: plan.creditsNeeded,
+        shortfall: summary.shortfallCredits,
+        registry: summary.registry,
+        protocol: summary.protocol,
+      },
+    }),
+  );
+}
+
+async function waitForCreditsToSettle(payload: Record<string, unknown>) {
+  while (true) {
+    await sleep(3_000);
+    const quote = await withBroker((client) => client.getRegistrationQuote(payload));
+    const shortfall = Math.max(0, quote.shortfallCredits ?? 0);
+    if (shortfall <= 0) {
+      console.log(`Broker now reports ${quote.availableCredits ?? 0} credits available.`);
+      return;
+    }
+    const continueWaiting = await promptYesNo(
+      `Credits not posted yet (shortfall ${shortfall}). Continue waiting? (y/N): `,
+    );
+    if (!continueWaiting) {
+      throw new Error('Credits purchase pending settlement. Re-run the workflow once the balance updates.');
+    }
+  }
+}
+
+async function promptYesNo(question: string) {
+  const rl = readline.createInterface({ input, output });
+  const answer = (await rl.question(question)).trim().toLowerCase();
+  rl.close();
+  return answer === 'y' || answer === 'yes';
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

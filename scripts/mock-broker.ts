@@ -29,21 +29,21 @@ server.listen(port, () => {
 });
 
 const handlers: Record<string, (payload: any) => any> = {
-  'rb.search': () => ({ hits: [] }),
-  'rb.vectorSearch': () => ({ hits: [] }),
-  'rb.getRegistrationQuote': () => ({ fee: '1 hbar' }),
-  'rb.registerAgent': () => ({ attemptId: 'mock-attempt' }),
-  'rb.waitForRegistrationCompletion': () => ({ result: { uaid: 'uaid:mock' } }),
-  'rb.chat.createSession': () => ({ sessionId: 'mock-session' }),
-  'rb.chat.sendMessage': () => ({ ok: true }),
-  'rb.chat.getHistory': () => ({ entries: [] }),
-  'rb.chat.compactHistory': () => ({ ok: true }),
-  'rb.chat.endSession': () => ({ ok: true }),
-  'rb.listProtocols': () => ({ protocols: [] }),
-  'rb.detectProtocol': () => ({ protocol: 'mock' }),
-  'rb.stats': () => ({ total: 0 }),
-  'rb.metricsSummary': () => ({ ok: true }),
-  'rb.dashboardStats': () => ({ ok: true }),
+  'hol.search': () => ({ hits: [] }),
+  'hol.vectorSearch': () => ({ hits: [] }),
+  'hol.getRegistrationQuote': () => ({ fee: '1 hbar' }),
+  'hol.registerAgent': () => ({ attemptId: 'mock-attempt' }),
+  'hol.waitForRegistrationCompletion': () => ({ result: { uaid: 'uaid:mock' } }),
+  'hol.chat.createSession': () => ({ sessionId: 'mock-session' }),
+  'hol.chat.sendMessage': () => ({ ok: true }),
+  'hol.chat.getHistory': () => ({ entries: [] }),
+  'hol.chat.compactHistory': () => ({ ok: true }),
+  'hol.chat.endSession': () => ({ ok: true }),
+  'hol.listProtocols': () => ({ protocols: [] }),
+  'hol.detectProtocol': () => ({ protocol: 'mock' }),
+  'hol.stats': () => ({ total: 0 }),
+  'hol.metricsSummary': () => ({ ok: true }),
+  'hol.dashboardStats': () => ({ ok: true }),
 };
 
 function handleToolCall(request: any, res: ServerResponse) {

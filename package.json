@@ -1,5 +1,5 @@
 {
-  "name": "@hol/hashnet-mcp",
+  "name": "@hol-org/hashnet-mcp",
   "version": "1.0.0",
   "description": "FastMCP server exposing Hashgraph Online Registry Broker tooling.",
   "type": "module",
@@ -41,6 +41,8 @@
     "workflow:list": "tsx scripts/list-workflows.ts",
     "workflow:run": "tsx scripts/run-workflow.ts",
     "workflow:register": "tsx scripts/workflow-register.ts",
+    "workflow:register:advanced": "tsx scripts/workflow-register-advanced.ts",
+    "workflow:register:erc8004": "tsx scripts/workflow-register-erc8004.ts",
     "mock:broker": "tsx scripts/mock-broker.ts"
   },
   "keywords": [],

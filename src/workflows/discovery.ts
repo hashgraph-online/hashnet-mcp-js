@@ -16,13 +16,13 @@ interface DiscoveryContext {
 
 const discoveryDefinition: PipelineDefinition<DiscoveryInput, DiscoveryContext> = {
   name: 'workflow.discovery',
-  description: 'Run rb.search and rb.vectorSearch to explore agents.',
+  description: 'Run hol.search and hol.vectorSearch to explore agents.',
   version: '1.0.0',
   requiredEnv: ['REGISTRY_BROKER_API_KEY'],
   createContext: () => ({ results: {} }),
   steps: [
     {
-      name: 'rb.search',
+      name: 'hol.search',
       description: 'Keyword search',
       allowDuringDryRun: true,
       run: async ({ input, context }) => {
@@ -33,7 +33,7 @@ const discoveryDefinition: PipelineDefinition<DiscoveryInput, DiscoveryContext> 
       },
     },
     {
-      name: 'rb.vectorSearch',
+      name: 'hol.vectorSearch',
       description: 'Vector similarity search',
       allowDuringDryRun: true,
       run: async ({ input, context }) => {

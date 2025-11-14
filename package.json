@@ -44,7 +44,9 @@
     "workflow:register": "tsx scripts/workflow-register.ts",
     "workflow:register:advanced": "tsx scripts/workflow-register-advanced.ts",
     "workflow:register:erc8004": "tsx scripts/workflow-register-erc8004.ts",
-    "mock:broker": "tsx scripts/mock-broker.ts"
+    "mock:broker": "tsx scripts/mock-broker.ts",
+    "claude:install": "tsx scripts/install-claude-code.ts",
+    "cursor:install": "tsx scripts/install-cursor.ts"
   },
   "keywords": [],
   "author": "",

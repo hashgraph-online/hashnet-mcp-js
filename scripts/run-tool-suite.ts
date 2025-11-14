@@ -26,9 +26,14 @@ const palette = {
   red: (text: string) => `\u001b[31m${text}\u001b[0m`,
   cyan: (text: string) => `\u001b[36m${text}\u001b[0m`,
 };
+const truncateLimit = Number(process.env.TOOL_SUITE_LOG_LIMIT ?? '2000');
 
 interface ScenarioContext {
   chatSessionId?: string;
+  discoveredUaid?: string;
+  registeredUaid?: string;
+  latestAttemptId?: string;
+  registrationPayload?: typeof agentPayload;
 }
 
 interface Scenario {
@@ -38,6 +43,7 @@ interface Scenario {
   needsContext?: (ctx: ScenarioContext) => boolean;
   payload: (ctx: ScenarioContext) => unknown;
   onResult?: (result: any, ctx: ScenarioContext) => void;
+  skipIf?: (ctx: ScenarioContext) => string | undefined;
 }
 
 function getEnv(name: string) {
@@ -47,12 +53,27 @@ function getEnv(name: string) {
 const agentPayload = JSON.parse(
   readFileSync(path.join(projectRoot, 'examples/agent-registration-request.json'), 'utf8'),
 );
+function buildRegistrationPayload() {
+  const clone = JSON.parse(JSON.stringify(agentPayload));
+  const suffix = Date.now().toString(36);
+  clone.profile = clone.profile ?? {};
+  clone.profile.display_name = `${clone.profile.display_name ?? 'Hashnet MCP'} ${suffix}`;
+  clone.profile.alias = `${clone.profile.alias ?? 'hashnet-mcp'}-${suffix}`;
+  return clone;
+}
 
 const scenarios: Scenario[] = [
   {
     tool: 'hol.search',
     description: 'Keyword search',
     payload: () => ({ q: 'hashgraph', limit: 2 }),
+    onResult: (result, ctx) => {
+      const structured = getStructured(result);
+      const firstHit = structured?.hits?.[0];
+      if (firstHit?.uaid) {
+        ctx.discoveredUaid = firstHit.uaid;
+      }
+    },
   },
   {
     tool: 'hol.vectorSearch',
@@ -62,40 +83,82 @@ const scenarios: Scenario[] = [
   {
     tool: 'hol.resolveUaid',
     description: 'Resolve UAID',
-    requiresEnv: ['TEST_UAID'],
-    payload: () => ({ uaid: getEnv('TEST_UAID')! }),
+    skipIf: (ctx) => (!getEnv('TEST_UAID') && !ctx.discoveredUaid ? 'no UAID available (set TEST_UAID or rely on hol.search results)' : undefined),
+    payload: (ctx) => {
+      const uaid = getEnv('TEST_UAID') ?? ctx.discoveredUaid;
+      if (!uaid) throw new Error('UAID not available');
+      return { uaid };
+    },
   },
   {
     tool: 'hol.closeUaidConnection',
     description: 'Close UAID connection',
-    requiresEnv: ['TEST_UAID'],
-    payload: () => ({ uaid: getEnv('TEST_UAID')! }),
+    skipIf: (ctx) =>
+      !getEnv('TEST_UAID') && !ctx.discoveredUaid && !ctx.registeredUaid ? 'no UAID available to close' : undefined,
+    payload: (ctx) => {
+      const uaid = getEnv('TEST_UAID') ?? ctx.discoveredUaid ?? ctx.registeredUaid;
+      if (!uaid) throw new Error('Missing UAID');
+      return { uaid };
+    },
   },
   {
     tool: 'hol.getRegistrationQuote',
     description: 'Registration quote',
-    payload: () => ({ payload: agentPayload }),
+    payload: (ctx) => {
+      ctx.registrationPayload = ctx.registrationPayload ?? buildRegistrationPayload();
+      return { payload: ctx.registrationPayload };
+    },
   },
   {
     tool: 'hol.registerAgent',
     description: 'Register agent (dry run)',
-    payload: () => ({ payload: agentPayload }),
+    payload: (ctx) => ({ payload: ctx.registrationPayload ?? buildRegistrationPayload() }),
+    onResult: (result, ctx) => {
+      const structured = getStructured(result);
+      if (structured?.attemptId) {
+        ctx.latestAttemptId = structured.attemptId;
+      }
+      if (structured?.uaid) {
+        ctx.registeredUaid = structured.uaid;
+      }
+    },
   },
   {
     tool: 'hol.waitForRegistrationCompletion',
     description: 'Wait for registration attempt',
-    requiresEnv: ['TEST_REGISTRATION_ATTEMPT_ID'],
-    payload: () => ({
-      attemptId: getEnv('TEST_REGISTRATION_ATTEMPT_ID')!,
-      intervalMs: 1000,
-      timeoutMs: 10_000,
-    }),
+    skipIf: (ctx) =>
+      !ctx.latestAttemptId && !getEnv('TEST_REGISTRATION_ATTEMPT_ID')
+        ? 'no registration attemptId available (set TEST_REGISTRATION_ATTEMPT_ID or rely on hol.registerAgent)'
+        : undefined,
+    payload: (ctx) => {
+      const attemptId = ctx.latestAttemptId ?? getEnv('TEST_REGISTRATION_ATTEMPT_ID');
+      if (!attemptId) throw new Error('Missing attemptId');
+      return {
+        attemptId,
+        intervalMs: 1000,
+        timeoutMs: 20_000,
+      };
+    },
+    onResult: (result, ctx) => {
+      const structured = getStructured(result);
+      const uaid = structured?.result?.uaid;
+      if (uaid) {
+        ctx.registeredUaid = uaid;
+      }
+    },
   },
   {
     tool: 'hol.chat.createSession',
     description: 'Create chat session',
-    requiresEnv: ['TEST_CHAT_UAID'],
-    payload: () => ({ uaid: getEnv('TEST_CHAT_UAID')!, historyTtlSeconds: 60 }),
+    skipIf: (ctx) =>
+      !getEnv('TEST_CHAT_UAID') && !ctx.registeredUaid && !ctx.discoveredUaid
+        ? 'no UAID available for chat (set TEST_CHAT_UAID or rely on workflow output)'
+        : undefined,
+    payload: (ctx) => {
+      const uaid = getEnv('TEST_CHAT_UAID') ?? ctx.registeredUaid ?? ctx.discoveredUaid;
+      if (!uaid) throw new Error('Missing chat UAID');
+      return { uaid, historyTtlSeconds: 60 };
+    },
     onResult: (result, ctx) => {
       ctx.chatSessionId = result?.sessionId;
     },
@@ -103,41 +166,45 @@ const scenarios: Scenario[] = [
   {
     tool: 'hol.chat.sendMessage',
     description: 'Send chat message',
-    requiresEnv: ['TEST_CHAT_UAID'],
+    skipIf: (ctx) =>
+      !ctx.chatSessionId ? 'chat session unavailable (hol.chat.createSession failed or skipped)' : undefined,
     needsContext: (ctx) => Boolean(ctx.chatSessionId),
     payload: (ctx) => ({ sessionId: ctx.chatSessionId!, message: 'ping' }),
   },
   {
     tool: 'hol.chat.history',
     description: 'Chat history',
-    requiresEnv: ['TEST_CHAT_UAID'],
+    skipIf: (ctx) =>
+      !ctx.chatSessionId ? 'chat session unavailable (hol.chat.createSession failed or skipped)' : undefined,
     needsContext: (ctx) => Boolean(ctx.chatSessionId),
     payload: (ctx) => ({ sessionId: ctx.chatSessionId! }),
   },
   {
     tool: 'hol.chat.compact',
     description: 'Compact chat history',
-    requiresEnv: ['TEST_CHAT_UAID'],
+    skipIf: (ctx) =>
+      !ctx.chatSessionId ? 'chat session unavailable (hol.chat.createSession failed or skipped)' : undefined,
     needsContext: (ctx) => Boolean(ctx.chatSessionId),
     payload: (ctx) => ({ sessionId: ctx.chatSessionId!, preserveEntries: 2 }),
   },
   {
     tool: 'hol.chat.end',
     description: 'End chat session',
-    requiresEnv: ['TEST_CHAT_UAID'],
+    skipIf: (ctx) =>
+      !ctx.chatSessionId ? 'chat session unavailable (hol.chat.createSession failed or skipped)' : undefined,
     needsContext: (ctx) => Boolean(ctx.chatSessionId),
     payload: (ctx) => ({ sessionId: ctx.chatSessionId! }),
   },
   {
     tool: 'hol.listProtocols',
     description: 'List protocols',
-    requiresEnv: ['BROKER_PROTOCOL_TOOLS'],
+    skipIf: () => ((process.env.BROKER_PROTOCOL_TOOLS ?? '').trim() !== '1' ? 'set BROKER_PROTOCOL_TOOLS=1 to enable protocol tools' : undefined),
     payload: () => ({}),
   },
   {
     tool: 'hol.detectProtocol',
     description: 'Detect protocol',
-    requiresEnv: ['BROKER_PROTOCOL_TOOLS'],
+    skipIf: () => ((process.env.BROKER_PROTOCOL_TOOLS ?? '').trim() !== '1' ? 'set BROKER_PROTOCOL_TOOLS=1 to enable protocol tools' : undefined),
     payload: () => ({ headers: { 'content-type': 'application/json' }, body: '{}' }),
   },
   {
@@ -230,6 +297,12 @@ function evaluateSkip(scenario: Scenario, ctx: ScenarioContext) {
       return `missing env vars ${missing.join(', ')}`;
     }
   }
+  if (scenario.skipIf) {
+    const message = scenario.skipIf(ctx);
+    if (message) {
+      return message;
+    }
+  }
   if (scenario.needsContext && !scenario.needsContext(ctx)) {
     return 'dependent context not satisfied';
   }
@@ -262,7 +335,7 @@ async function waitForHealth(endpoint: string, timeoutMs = 10_000) {
   }
 }
 
-function truncate(text: string, max = 200) {
+function truncate(text: string, max = truncateLimit) {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
@@ -307,6 +380,27 @@ async function stopProcess(proc: ReturnType<typeof spawn> | undefined, signal: N
     proc.once('exit', () => resolve());
     proc.kill(signal);
   });
+}
+
+function getStructured(result: any) {
+  if (result && typeof result === 'object' && result.structuredContent && typeof result.structuredContent === 'object') {
+    return result.structuredContent as Record<string, any>;
+  }
+  const textBlock = Array.isArray(result?.content)
+    ? result.content.find((entry: any) => entry?.type === 'text' && typeof entry.text === 'string' && entry.text.includes('{'))
+    : undefined;
+  if (textBlock) {
+    const [, ...jsonLines] = textBlock.text.split('\n');
+    const candidate = jsonLines.join('\n').trim();
+    if (candidate) {
+      try {
+        return JSON.parse(candidate);
+      } catch {
+        // ignore parse errors
+      }
+    }
+  }
+  return undefined;
 }
 
 main().catch((error) => {

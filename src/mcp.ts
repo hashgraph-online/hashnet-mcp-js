@@ -360,8 +360,8 @@ export const toolDefinitions: ToolDefinition[] = [
       const hederaAccountId = input.hederaAccountId;
       const [apiKeyBalance, hederaBalance, x402Balance] = await Promise.all([
         getCreditBalance(),
-        hederaAccountId ? getCreditBalance(hederaAccountId) : Promise.resolve(null),
-        input.x402AccountId ? getCreditBalance(input.x402AccountId) : Promise.resolve(null),
+        hederaAccountId ? safeBalanceLookup('hedera', hederaAccountId) : Promise.resolve(null),
+        input.x402AccountId ? safeBalanceLookup('x402', input.x402AccountId) : Promise.resolve(null),
       ]);
       return {
         apiKey: apiKeyBalance,
@@ -541,6 +541,12 @@ function normalizeResult(value: unknown): { content: Content[]; structuredConten
       isError: typeof record.isError === 'boolean' ? (record.isError as boolean) : undefined,
     };
   }
+  if (isPlainObject(value)) {
+    return {
+      content: [buildObjectContent('tool.result', value as Record<string, unknown>)],
+      structuredContent: value as Record<string, unknown>,
+    };
+  }
   return { content: normalizeContent(value) };
 }
 
@@ -587,6 +593,15 @@ async function runBrokerCall<T>(label: string, fn: () => Promise<T>) {
       throw new Error(`${label} failed (${error.status} ${error.statusText ?? ''}): ${body}`);
     }
     throw error;
+  }
+}
+
+async function safeBalanceLookup(label: 'hedera' | 'x402', accountId: string) {
+  try {
+    return await getCreditBalance(accountId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { error: `${label} balance unavailable: ${message}`, accountId };
   }
 }
 

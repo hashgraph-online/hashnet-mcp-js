@@ -67,7 +67,7 @@ Each workflow emits a structured report (steps, timings, context) whether execut
 - `BROKER_E2E=1` — opt into real broker hits in CI; otherwise the mock broker is used when available.
 - `BROKER_AUTO_TOP_UP=1` — opt into automatic broker purchases without HITL prompts (defaults to manual approvals).
 - X402 workflows also require EVM wallet details (see `examples/workflows/workflow.x402*.json`) plus any ledger challenge metadata referenced in the payload.
-- Tool-suite fixtures (optional): `TEST_UAID`, `TEST_CHAT_UAID`, `TEST_REGISTRATION_ATTEMPT_ID`, and `BROKER_PROTOCOL_TOOLS`. Populate them (see `.env.example`) so `pnpm test:tools` can exercise UAID/chat flows locally or skip protocol checks when the broker doesn’t expose those endpoints.
+- Tool-suite fixtures (optional): `TEST_UAID`, `TEST_CHAT_UAID`, `TEST_REGISTRATION_ATTEMPT_ID`, and `BROKER_PROTOCOL_TOOLS`. Populate them (see `.env.example`) so `pnpm test:tools` can exercise UAID/chat flows locally or skip protocol checks when the broker doesn’t expose those endpoints; leave blank to rely on auto-discovered UAIDs/attempt IDs from the preceding scenarios.
 Workflow pipelines declare their required env vars and will fail fast with a descriptive error if anything is missing; payload-specific secrets (OpenRouter tokens, Agentverse headers, bearer tokens) should be supplied via `.env` or injected by your CLI before invoking the workflow.
 
 ### Running `pnpm workflow:register`

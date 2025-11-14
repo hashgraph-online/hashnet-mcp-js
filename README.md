@@ -53,6 +53,17 @@ Claude Desktop (stdio):
 
 Claude Code / Cursor (HTTP streaming): point the client at `https://<host>/mcp/stream` once deployed (see `deploy/README.md`). Use `pnpm dev:sse` locally to expose the same endpoint at `http://localhost:3333/mcp/stream`. SSE fallback remains available at `/mcp/sse` for clients that still require it.
 
+#### Claude Code auto-install
+- `pnpm claude:install --endpoint http://localhost:3333/mcp/stream` — adds/updates the MCP entry inside Claude Code’s config (`~/Library/Application Support/Claude/claude_code_config.json` on macOS; `%APPDATA%\Claude\claude_code_config.json` on Windows; `~/.config/Claude/claude_code_config.json` on Linux).
+- Pass `--name <id>` to customize the MCP server handle or `--config <path>` if your Claude Code build stores config elsewhere.
+- Use `--force` to overwrite an existing entry, `--dry-run` to preview changes, and `--skip-backup` to avoid writing a `.bak` file next to the config.
+- After running the script, restart Claude Code so the client discovers the new `hol.*` tool catalog automatically.
+
+#### Cursor auto-install
+- `pnpm cursor:install --endpoint http://localhost:3333/mcp/stream` — writes/updates the `modelContextProtocol.servers` array inside Cursor’s `settings.json` (`~/Library/Application Support/Cursor/User/settings.json` on macOS; `%APPDATA%\Cursor\User\settings.json` on Windows; `~/.config/Cursor/User/settings.json` on Linux).
+- Use `--name <id>` to change the MCP handle, `--config <path>` to point at a custom settings file, and `--force` if you need to replace an existing server entry.
+- Add `--dry-run` to preview the merged JSON. Once applied, restart Cursor so the MCP list refreshes and exposes the `hol.*` commands.
+
 ### Workflow Helpers
 Run `pnpm workflow:list` to see the live catalog (the script reads `src/workflows/index.ts`, so it never goes stale). Each workflow’s golden-path payload lives under `examples/workflows/`—copy one, replace the placeholder UAIDs/keys, and pass it to `pnpm workflow:run <workflow> --payload <file>`.
 
@@ -175,7 +186,7 @@ These FastMCP tools are available everywhere the server runs (CLI, Claude Deskto
 - `WORKFLOW_DRY_RUN=1` – skip state-changing steps (quote-only, no registration).
 - `BROKER_E2E=1` – opt in to real broker calls inside CI/e2e scripts (otherwise the mock broker is used where possible).
 - `BROKER_AUTO_TOP_UP=1` – opt in to automatic broker purchases without prompts (defaults to `0`, which enables HITL confirmation).
-- Tool-suite fixtures (optional): `TEST_UAID`, `TEST_CHAT_UAID`, `TEST_REGISTRATION_ATTEMPT_ID`, and `BROKER_PROTOCOL_TOOLS`. Populate these in `.env` (see `.env.example`) so `pnpm test:tools` can run UAID/chat flows locally and skip protocol checks unless your API key has access.
+- Tool-suite fixtures (optional): `TEST_UAID`, `TEST_CHAT_UAID`, `TEST_REGISTRATION_ATTEMPT_ID`, and `BROKER_PROTOCOL_TOOLS`. Populate these in `.env` (see `.env.example`) so `pnpm test:tools` can run UAID/chat flows locally and skip protocol checks unless your API key has access. Leave them blank to let the suite auto-discover UAIDs/attempt IDs from preceding steps.
 
 Each workflow definition lists its required env vars and the pipeline runner will fail fast (before touching the broker) if any are missing. Restart the MCP server after changing credentials so FastMCP snapshots the updated environment.
 

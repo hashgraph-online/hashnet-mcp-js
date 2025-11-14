@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "hashnet-mcp": {
+      "transport": {
+        "type": "http",
+        "url": "http://localhost:3333/mcp/stream"
+      },
+      "metadata": {
+        "description": "Hashnet MCP (Registry Broker via FastMCP HTTP transport)"
+      }
+    }
+  }
+}

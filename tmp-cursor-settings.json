@@ -1,0 +1,11 @@
+{
+  "modelContextProtocol.servers": [
+    {
+      "name": "hashnet-mcp",
+      "transport": {
+        "type": "http",
+        "url": "http://localhost:3333/mcp/stream"
+      }
+    }
+  ]
+}

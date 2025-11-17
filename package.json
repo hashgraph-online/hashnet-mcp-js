@@ -1,6 +1,6 @@
 {
   "name": "@hol-org/hashnet-mcp",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "FastMCP server exposing Hashgraph Online Registry Broker tooling.",
   "type": "module",
   "main": "./dist/index.js",
@@ -48,9 +48,32 @@
     "claude:install": "tsx scripts/install-claude-code.ts",
     "cursor:install": "tsx scripts/install-cursor.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "homepage": "https://hashgraphonline.com",
+  "funding": {
+    "type": "individual",
+    "url": "https://github.com/sponsors/hashgraph-online"
+  },
+  "bugs": {
+    "url": "https://github.com/hashgraph-online/hashnet-mcp-js/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hashgraph-online/hashnet-mcp-js.git"
+  },
+  "keywords": [
+    "hashgraph online",
+    "hedera",
+    "hashgraph",
+    "web3",
+    "mcp",
+    "fastmcp",
+    "agent",
+    "registry broker",
+    "standards",
+    "sdk"
+  ],
+  "author": "Hashgraph Online <hello@hashgraphonline.com>",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">=18"
   },
@@ -64,7 +87,7 @@
     "vitest": "^2.1.4"
   },
   "dependencies": {
-    "@hashgraphonline/standards-sdk": "^0.1.128",
+    "@hashgraphonline/standards-sdk": "^0.1.136",
     "@hono/node-server": "^1.19.6",
     "@modelcontextprotocol/sdk": "^1.21.1",
     "bottleneck": "^2.19.5",
@@ -75,5 +98,8 @@
     "pino": "^10.1.0",
     "undici": "^7.16.0",
     "zod": "^4.1.12"
+  },
+  "overrides": {
+    "@hashgraphonline/standards-sdk": "^0.1.136"
   }
 }

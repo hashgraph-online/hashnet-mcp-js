@@ -29,9 +29,9 @@ const logWarn = (...messages: any[]) => (preferStderr ? console.error(...message
 
 try {
   ensureNodeVersion();
-  const packageManager = detectPackageManager();
+  const packageManager = detectPackageManager(preferStderr);
   ensurePnpmConfig();
-  installDependencies(packageManager);
+  installDependencies(packageManager, preferStderr);
   ensureEnvFile();
 
   if (installOnly) {
@@ -39,7 +39,7 @@ try {
     process.exit(0);
   }
 
-  runServer(packageManager, transport);
+  runServer(packageManager, transport, preferStderr);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
@@ -78,13 +78,18 @@ function ensureNodeVersion() {
   }
 }
 
-function detectPackageManager(): 'pnpm' | 'npm' {
+function detectPackageManager(preferStderr: boolean): 'pnpm' | 'npm' {
   if (commandExists('pnpm')) {
     return 'pnpm';
   }
 
   logWarn('pnpm not detected. Attempting to enable via corepack...');
-  const enabled = spawnSync('corepack', ['enable', 'pnpm'], { stdio: 'inherit' });
+  const enabled = spawnSync('corepack', ['enable', 'pnpm'], {
+    stdio: preferStderr ? ['ignore', 'pipe', 'inherit'] : 'inherit',
+  });
+  if (preferStderr && enabled.stdout?.length) {
+    process.stderr.write(enabled.stdout);
+  }
   if (enabled.status === 0 && commandExists('pnpm')) {
     return 'pnpm';
   }
@@ -102,7 +107,7 @@ function commandExists(bin: string) {
   }
 }
 
-function installDependencies(pm: 'pnpm' | 'npm') {
+function installDependencies(pm: 'pnpm' | 'npm', preferStderr: boolean) {
   logInfo(`Installing dependencies with ${pm}...`);
   const baseEnv = {
     ...process.env,
@@ -113,9 +118,12 @@ function installDependencies(pm: 'pnpm' | 'npm') {
 
   const installResult = spawnSync(pm, pm === 'pnpm' ? ['install'] : npmArgs, {
     cwd: projectRoot,
-    stdio: 'inherit',
+    stdio: preferStderr ? ['ignore', 'pipe', 'inherit'] : 'inherit',
     env: baseEnv,
   });
+  if (preferStderr && installResult.stdout?.length) {
+    process.stderr.write(installResult.stdout);
+  }
   if (installResult.status !== 0) {
     throw new Error(`${pm} install failed.`);
   }
@@ -149,7 +157,7 @@ function ensureEnvFile() {
   }
 }
 
-function runServer(pm: 'pnpm' | 'npm', transport: string) {
+function runServer(pm: 'pnpm' | 'npm', transport: string, preferStderr: boolean) {
   if (!['stdio', 'sse'].includes(transport)) {
     throw new Error(`Unsupported transport "${transport}". Use stdio or sse.`);
   }
@@ -160,9 +168,12 @@ function runServer(pm: 'pnpm' | 'npm', transport: string) {
     logInfo('dist/index.js not found. Building project before start...');
     const buildResult = spawnSync(pm, ['run', 'build'], {
       cwd: projectRoot,
-      stdio: 'inherit',
+      stdio: preferStderr ? ['ignore', 'pipe', 'inherit'] : 'inherit',
       env,
     });
+    if (preferStderr && buildResult.stdout?.length) {
+      process.stderr.write(buildResult.stdout);
+    }
     if (buildResult.status !== 0) {
       throw new Error(`${pm} run build exited with code ${buildResult.status}`);
     }

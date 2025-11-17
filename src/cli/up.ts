@@ -1,6 +1,5 @@
-#!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync } from 'node:fs';
+import { copyFileSync, existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -28,6 +27,7 @@ const installOnly = Boolean(flags['install-only']);
 try {
   ensureNodeVersion();
   const packageManager = detectPackageManager();
+  ensurePnpmConfig();
   installDependencies(packageManager);
   ensureEnvFile();
 
@@ -101,13 +101,40 @@ function commandExists(bin: string) {
 
 function installDependencies(pm: 'pnpm' | 'npm') {
   console.log(`Installing dependencies with ${pm}...`);
-  const installResult = spawnSync(pm, ['install'], {
+  const baseEnv = {
+    ...process.env,
+    NODE_OPTIONS: process.env.NODE_OPTIONS ?? '--max-old-space-size=8192',
+  };
+
+  const npmArgs = ['install', '--legacy-peer-deps'];
+
+  const installResult = spawnSync(pm, pm === 'pnpm' ? ['install'] : npmArgs, {
     cwd: projectRoot,
     stdio: 'inherit',
+    env: baseEnv,
   });
   if (installResult.status !== 0) {
     throw new Error(`${pm} install failed.`);
   }
+}
+
+function ensurePnpmConfig() {
+  const npmrcPath = path.join(projectRoot, '.npmrc');
+  if (existsSync(npmrcPath)) {
+    return;
+  }
+
+  const content = [
+    'node-linker=isolated',
+    'shamefully-hoist=false',
+    'strict-peer-dependencies=false',
+    'auto-install-peers=false',
+    'resolution-mode=lowest-direct',
+    'node-options=--max-old-space-size=8192',
+    'child-concurrency=4',
+  ].join('\n');
+
+  writeFileSync(npmrcPath, content);
 }
 
 function ensureEnvFile() {
@@ -123,15 +150,28 @@ function runServer(pm: 'pnpm' | 'npm', transport: string) {
   if (!['stdio', 'sse'].includes(transport)) {
     throw new Error(`Unsupported transport "${transport}". Use stdio or sse.`);
   }
-  const script = transport === 'stdio' ? 'dev:stdio' : 'dev:sse';
-  console.log(`Starting ${transport} transport via ${pm} run ${script}...`);
-  const runner = ['run', script];
-  const child = spawnSync(pm, runner, {
+  const distEntry = path.join(projectRoot, 'dist', 'index.js');
+  const env = { ...process.env, MCP_TRANSPORT: transport };
+
+  if (!existsSync(distEntry)) {
+    console.log('dist/index.js not found. Building project before start...');
+    const buildResult = spawnSync(pm, ['run', 'build'], {
+      cwd: projectRoot,
+      stdio: 'inherit',
+      env,
+    });
+    if (buildResult.status !== 0) {
+      throw new Error(`${pm} run build exited with code ${buildResult.status}`);
+    }
+  }
+
+  console.log(`Starting ${transport} transport via ${pm} run start...`);
+  const child = spawnSync(pm, ['run', 'start'], {
     cwd: projectRoot,
     stdio: 'inherit',
-    env: { ...process.env },
+    env,
   });
   if (child.status !== 0) {
-    throw new Error(`${pm} run ${script} exited with code ${child.status}`);
+    throw new Error(`${pm} run start exited with code ${child.status}`);
   }
 }

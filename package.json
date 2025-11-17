@@ -48,9 +48,32 @@
     "claude:install": "tsx scripts/install-claude-code.ts",
     "cursor:install": "tsx scripts/install-cursor.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "homepage": "https://hashgraphonline.com",
+  "funding": {
+    "type": "individual",
+    "url": "https://github.com/sponsors/hashgraph-online"
+  },
+  "bugs": {
+    "url": "https://github.com/hashgraph-online/hashnet-mcp-js/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hashgraph-online/hashnet-mcp-js.git"
+  },
+  "keywords": [
+    "hashgraph online",
+    "hedera",
+    "hashgraph",
+    "web3",
+    "mcp",
+    "fastmcp",
+    "agent",
+    "registry broker",
+    "standards",
+    "sdk"
+  ],
+  "author": "Hashgraph Online <hello@hashgraphonline.com>",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">=18"
   },

@@ -32,6 +32,7 @@ const envSchema = z
       .enum(['0', '1'])
       .optional()
       .transform((value) => value === '1'),
+    HTTP_STREAM_PORT: z.coerce.number().int().positive().optional(),
   })
   .superRefine((val, ctx) => {
     const hasAccount = Boolean(val.HEDERA_ACCOUNT_ID);
@@ -65,6 +66,7 @@ const parsed = envSchema.safeParse({
   LOG_LEVEL: normalized(process.env.LOG_LEVEL),
   WORKFLOW_DRY_RUN: normalized(process.env.WORKFLOW_DRY_RUN),
   BROKER_AUTO_TOP_UP: normalized(process.env.BROKER_AUTO_TOP_UP),
+  HTTP_STREAM_PORT: normalized(process.env.HTTP_STREAM_PORT),
 });
 
 if (!parsed.success) {

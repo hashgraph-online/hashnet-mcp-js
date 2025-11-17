@@ -1,11 +1,9 @@
 {
-  "modelContextProtocol.servers": [
-    {
-      "name": "hashnet-mcp",
-      "transport": {
-        "type": "http",
-        "url": "http://localhost:3333/mcp/stream"
-      }
+  "mcpServers": {
+    "hashnet-mcp": {
+      "enabled": true,
+      "type": "sse",
+      "url": "http://localhost:3333/mcp/sse"
     }
-  ]
+  }
 }

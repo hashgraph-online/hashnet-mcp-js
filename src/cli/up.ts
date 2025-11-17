@@ -23,6 +23,9 @@ if (command !== 'up') {
 const flags = parseFlags(args.slice(1));
 const transport = (flags.transport ?? 'stdio').toLowerCase();
 const installOnly = Boolean(flags['install-only']);
+const preferStderr = transport === 'stdio';
+const logInfo = (...messages: any[]) => (preferStderr ? console.error(...messages) : console.log(...messages));
+const logWarn = (...messages: any[]) => (preferStderr ? console.error(...messages) : console.warn(...messages));
 
 try {
   ensureNodeVersion();
@@ -32,7 +35,7 @@ try {
   ensureEnvFile();
 
   if (installOnly) {
-    console.log('Dependencies installed. Skipping server launch (--install-only set).');
+    logInfo('Dependencies installed. Skipping server launch (--install-only set).');
     process.exit(0);
   }
 
@@ -80,13 +83,13 @@ function detectPackageManager(): 'pnpm' | 'npm' {
     return 'pnpm';
   }
 
-  console.warn('pnpm not detected. Attempting to enable via corepack...');
+  logWarn('pnpm not detected. Attempting to enable via corepack...');
   const enabled = spawnSync('corepack', ['enable', 'pnpm'], { stdio: 'inherit' });
   if (enabled.status === 0 && commandExists('pnpm')) {
     return 'pnpm';
   }
 
-  console.warn('Falling back to npm. Install pnpm globally for faster installs.');
+  logWarn('Falling back to npm. Install pnpm globally for faster installs.');
   return 'npm';
 }
 
@@ -100,7 +103,7 @@ function commandExists(bin: string) {
 }
 
 function installDependencies(pm: 'pnpm' | 'npm') {
-  console.log(`Installing dependencies with ${pm}...`);
+  logInfo(`Installing dependencies with ${pm}...`);
   const baseEnv = {
     ...process.env,
     NODE_OPTIONS: process.env.NODE_OPTIONS ?? '--max-old-space-size=8192',
@@ -142,7 +145,7 @@ function ensureEnvFile() {
   const examplePath = path.join(projectRoot, '.env.example');
   if (!existsSync(envPath) && existsSync(examplePath)) {
     copyFileSync(examplePath, envPath);
-    console.log('Created .env from .env.example. Remember to fill in your credentials.');
+    logInfo('Created .env from .env.example. Remember to fill in your credentials.');
   }
 }
 
@@ -154,7 +157,7 @@ function runServer(pm: 'pnpm' | 'npm', transport: string) {
   const env = { ...process.env, MCP_TRANSPORT: transport };
 
   if (!existsSync(distEntry)) {
-    console.log('dist/index.js not found. Building project before start...');
+    logInfo('dist/index.js not found. Building project before start...');
     const buildResult = spawnSync(pm, ['run', 'build'], {
       cwd: projectRoot,
       stdio: 'inherit',
@@ -165,7 +168,7 @@ function runServer(pm: 'pnpm' | 'npm', transport: string) {
     }
   }
 
-  console.log(`Starting ${transport} transport via ${pm} run start...`);
+  logInfo(`Starting ${transport} transport via ${pm} run start...`);
   const child = spawnSync(pm, ['run', 'start'], {
     cwd: projectRoot,
     stdio: 'inherit',

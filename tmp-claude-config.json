@@ -2,9 +2,10 @@
   "mcpServers": {
     "hashnet-mcp": {
       "transport": {
-        "type": "http",
-        "url": "http://localhost:3333/mcp/stream"
+        "type": "sse",
+        "url": "http://localhost:3333/mcp/sse"
       },
+      "command": null,
       "metadata": {
         "description": "Hashnet MCP (Registry Broker via FastMCP HTTP transport)"
       }

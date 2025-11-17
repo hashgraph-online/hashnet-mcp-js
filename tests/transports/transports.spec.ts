@@ -1,12 +1,10 @@
 import http, { IncomingMessage, ServerResponse } from 'node:http';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
-const stdioMock = vi.fn().mockResolvedValue(undefined);
 const startMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('../../src/mcp', () => ({
   mcp: {
-    stdio: stdioMock,
     start: startMock,
   },
   registeredTools: [{ name: 'hol.search' }],
@@ -16,7 +14,6 @@ const createServerSpy = vi.spyOn(http, 'createServer');
 const listenSpy = vi.fn();
 
 beforeEach(() => {
-  stdioMock.mockClear();
   startMock.mockClear();
   listenSpy.mockReset();
 
@@ -39,7 +36,7 @@ describe('transports', () => {
   it('invokes stdio transport when requested', async () => {
     const { runStdio } = await import('../../src/transports');
     await runStdio();
-    expect(stdioMock).toHaveBeenCalledTimes(1);
+    expect(startMock).toHaveBeenCalledWith(expect.objectContaining({ transportType: 'stdio' }));
   });
 
   it('starts upstream HTTP stream backend and gateway server', async () => {

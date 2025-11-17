@@ -9,8 +9,8 @@ const LOOPBACK = '127.0.0.1';
 
 export async function runStdio() {
   logger.info('Starting stdio transport');
-  await mcp.stdio();
-  logger.info('Stdio transport exited');
+  await mcp.start({ transportType: 'stdio' });
+  logger.info('Stdio transport started');
 }
 
 export async function runSSE() {

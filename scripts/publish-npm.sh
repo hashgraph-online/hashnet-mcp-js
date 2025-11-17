@@ -32,7 +32,7 @@ echo "==> Running smoke tests"
 pnpm test:run
 
 echo "==> Checking version availability"
-PKG_VERSION="$(node -p \"require('./package.json').version\")"
+PKG_VERSION="$(node -p "require('./package.json').version")"
 if npm view @hol-org/hashnet-mcp@${PKG_VERSION} version >/tmp/npm-view.log 2>&1; then
   echo "Version ${PKG_VERSION} is already published. Bump version before publishing." >&2
   exit 1

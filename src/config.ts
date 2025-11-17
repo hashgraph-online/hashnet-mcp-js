@@ -2,7 +2,7 @@ import { config as loadEnv } from 'dotenv';
 import { z } from 'zod';
 
 if (process.env.NODE_ENV !== 'test') {
-  loadEnv();
+  loadEnv({ quiet: true });
 }
 
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace'] as const;

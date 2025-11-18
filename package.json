@@ -1,6 +1,6 @@
 {
   "name": "@hol-org/hashnet-mcp",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "FastMCP server exposing Hashgraph Online Registry Broker tooling.",
   "type": "module",
   "main": "./dist/index.js",

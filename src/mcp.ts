@@ -39,7 +39,7 @@ const connectionInstructions = [
   'You expose the Hashgraph Online Registry Broker via hol.* primitives and workflow.* pipelines. Prefer workflow.* when possible—they bundle common steps and return a pipeline summary plus full results.',
   'Discovery: use workflow.discovery (or hol.search / hol.vectorSearch) to find UAIDs/agents/MCP servers; pass q/query and optional filters like capabilities, metadata, or type=ai-agents|mcp-servers.',
   'Registration: workflow.registerMcp (quote → register → wait) is the default; workflow.fullRegistration adds discovery/chat/ops. hol.registerAgent + hol.waitForRegistrationCompletion are the lower-level primitives.',
-  'Chat: call hol.resolveUaid if the UAID is unverified, then hol.chat.createSession (include auth if provided) followed by hol.chat.sendMessage. Use hol.chat.history/compact/end to manage the session.',
+  'Chat: call hol.resolveUaid if the UAID is unverified, then hol.chat.createSession (uaid or agentUrl + optional auth) followed by hol.chat.sendMessage (sessionId or uaid/agentUrl). Use hol.chat.history/compact/end to manage the session.',
   'Operations: workflow.opsCheck or hol.stats/hol.metricsSummary/hol.dashboardStats show registry health; hol.listProtocols + hol.detectProtocol help route third-party requests.',
   'Credits: check hol.credits.balance before purchases. Use hol.purchaseCredits.hbar or hol.x402.buyCredits only with explicit user approval (X402 requires an EVM key); hol.x402.minimums provides thresholds.',
   'Always include UAIDs/sessionIds exactly as given and echo any auth headers/tokens the user supplies. If required fields are missing (UAID, payload, accountId), ask for them before calling tools.',
@@ -58,17 +58,33 @@ const agentAuthSchema: z.ZodType<AgentAuthConfig> = z
   })
   .partial() as z.ZodType<AgentAuthConfig>;
 
-const chatSessionSchema: z.ZodType<ChatCreateSessionPayload> = z.object({
-  uaid: z.string().min(1),
-  historyTtlSeconds: z.number().int().positive().optional(),
-  auth: agentAuthSchema.optional(),
-}) as z.ZodType<ChatCreateSessionPayload>;
+const chatSessionSchema: z.ZodType<ChatCreateSessionPayload> = z
+  .object({
+    uaid: z.string().min(1).optional(),
+    agentUrl: z.string().url().optional(),
+    historyTtlSeconds: z.number().int().positive().optional(),
+    auth: agentAuthSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.uaid && !value.agentUrl) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'uaid or agentUrl is required' });
+    }
+  }) as z.ZodType<ChatCreateSessionPayload>;
 
-const chatMessageSchema: z.ZodType<ChatSendMessagePayload> = z.object({
-  sessionId: z.string().min(1),
-  message: z.string().min(1),
-  auth: agentAuthSchema.optional(),
-}) as z.ZodType<ChatSendMessagePayload>;
+const chatMessageSchema: z.ZodType<ChatSendMessagePayload> = z
+  .object({
+    sessionId: z.string().min(1).optional(),
+    uaid: z.string().min(1).optional(),
+    agentUrl: z.string().url().optional(),
+    message: z.string().min(1),
+    streaming: z.boolean().optional(),
+    auth: agentAuthSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.sessionId && !value.uaid && !value.agentUrl) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Provide sessionId for existing chats or uaid/agentUrl to start a new one.' });
+    }
+  }) as z.ZodType<ChatSendMessagePayload>;
 
 const chatCompactSchema: z.ZodType<ChatCompactPayload> = z.object({
   sessionId: z.string().min(1),
@@ -216,13 +232,13 @@ export const toolDefinitions: ToolDefinition[] = [
     name: 'hol.search',
     description: 'Keyword search for agents or MCP servers with filtering controls.',
     schema: searchInput,
-    handler: (input) => withBroker((client) => client.search(input)),
+    handler: (input) => withBroker((client) => client.search(input), 'hol.search'),
   },
   {
     name: 'hol.vectorSearch',
     description: 'Vector similarity search across registered agents.',
     schema: vectorSearchInput,
-    handler: (input) => withBroker((client) => client.vectorSearch(input)),
+    handler: (input) => withBroker((client) => client.vectorSearch(input), 'hol.vectorSearch'),
   },
   {
     name: 'hol.resolveUaid',
@@ -236,25 +252,25 @@ export const toolDefinitions: ToolDefinition[] = [
           client.getUaidConnectionStatus(uaid),
         ]);
         return { resolved, validation, status };
-      }),
+      }, 'hol.resolveUaid'),
   },
   {
     name: 'hol.closeUaidConnection',
     description: 'Force-close any open UAID connection.',
     schema: uaidInput,
-    handler: ({ uaid }) => withBroker((client) => client.closeUaidConnection(uaid)),
+    handler: ({ uaid }) => withBroker((client) => client.closeUaidConnection(uaid), 'hol.closeUaidConnection'),
   },
   {
     name: 'hol.getRegistrationQuote',
     description: 'Estimate fees for a given agent registration payload.',
     schema: registrationPayload,
-    handler: ({ payload }) => withBroker((client) => client.getRegistrationQuote(payload)),
+    handler: ({ payload }) => withBroker((client) => client.getRegistrationQuote(payload), 'hol.getRegistrationQuote'),
   },
   {
     name: 'hol.registerAgent',
     description: 'Submit an HCS-11-compatible agent registration.',
     schema: registrationPayload,
-    handler: ({ payload }) => withBroker((client) => client.registerAgent(payload)),
+    handler: ({ payload }) => withBroker((client) => client.registerAgent(payload), 'hol.registerAgent'),
   },
   {
     name: 'hol.waitForRegistrationCompletion',
@@ -266,111 +282,141 @@ export const toolDefinitions: ToolDefinition[] = [
           intervalMs,
           timeoutMs,
         }),
+        'hol.waitForRegistrationCompletion',
       ),
   },
   {
     name: 'hol.updateAgent',
     description: 'Update an existing agent registration payload.',
     schema: updateAgentInput,
-    handler: ({ uaid, payload }) => withBroker((client) => client.updateAgent(uaid, payload as UpdateAgentPayload)),
+    handler: ({ uaid, payload }) => withBroker((client) => client.updateAgent(uaid, payload as UpdateAgentPayload), 'hol.updateAgent'),
   },
   {
     name: 'hol.additionalRegistries',
     description: 'Retrieve the catalog of additional registries and networks.',
     schema: emptyObject,
-    handler: () => withBroker((client) => client.getAdditionalRegistries()),
+    handler: () => withBroker((client) => client.getAdditionalRegistries(), 'hol.additionalRegistries'),
   },
   {
     name: 'hol.registrySearchByNamespace',
     description: 'Search within a specific registry namespace.',
     schema: registryNamespaceInput,
     handler: ({ registry, query }) =>
-      withBroker((client) => client.registrySearchByNamespace(registry, query)),
+      withBroker((client) => client.registrySearchByNamespace(registry, query), 'hol.registrySearchByNamespace'),
   },
   {
     name: 'hol.chat.createSession',
     description: 'Open a chat session linked to a UAID.',
     schema: chatSessionSchema,
-    handler: (input) => withBroker((client) => client.chat.createSession(input)),
+    handler: (input) => withBroker((client) => client.chat.createSession(input), 'hol.chat.createSession'),
   },
   {
     name: 'hol.chat.sendMessage',
     description: 'Send a message to an active chat session.',
     schema: chatMessageSchema,
-    handler: (input) => withBroker((client) => client.chat.sendMessage(input)),
+    handler: (input) =>
+      withBroker(async (client) => {
+        if (input.sessionId) {
+          return client.chat.sendMessage(input);
+        }
+
+        const uaid = (input as any).uaid;
+        const agentUrl = (input as any).agentUrl;
+        if (!uaid && !agentUrl) {
+          throw new Error('sessionId missing; provide uaid or agentUrl so a session can be created before sending.');
+        }
+
+        // Auto-create a session when callers only supply a UAID/agentUrl.
+        const session = await client.chat.createSession({
+          uaid,
+          agentUrl,
+          auth: input.auth,
+        } as any);
+        const sessionId = (session as any).sessionId ?? (session as any).id;
+        if (!sessionId) {
+          throw new Error('Unable to determine sessionId from broker response when auto-creating chat session.');
+        }
+
+        return client.chat.sendMessage({
+          sessionId,
+          message: input.message,
+          auth: input.auth,
+          streaming: input.streaming,
+        } as any);
+      }, 'hol.chat.sendMessage'),
   },
   {
     name: 'hol.chat.history',
     description: 'Retrieve the message history for a chat session.',
     schema: sessionIdInput,
-    handler: ({ sessionId }) => withBroker((client) => client.chat.getHistory(sessionId)),
+    handler: ({ sessionId }) => withBroker((client) => client.chat.getHistory(sessionId), 'hol.chat.history'),
   },
   {
     name: 'hol.chat.compact',
     description: 'Compact chat history while preserving the latest entries.',
     schema: chatCompactSchema,
-    handler: (input) => withBroker((client) => client.chat.compactHistory(input)),
+    handler: (input) => withBroker((client) => client.chat.compactHistory(input), 'hol.chat.compact'),
   },
   {
     name: 'hol.chat.end',
     description: 'End a chat session and release broker resources.',
     schema: sessionIdInput,
-    handler: ({ sessionId }) => withBroker((client) => client.chat.endSession(sessionId)),
+    handler: ({ sessionId }) => withBroker((client) => client.chat.endSession(sessionId), 'hol.chat.end'),
   },
   {
     name: 'hol.listProtocols',
     description: 'List all registered protocols/adapters known to the broker.',
     schema: emptyObject,
-    handler: () => runBrokerCall('hol.listProtocols', () => withBroker((client) => client.listProtocols())),
+    handler: () => runBrokerCall('hol.listProtocols', () => withBroker((client) => client.listProtocols(), 'hol.listProtocols')),
   },
   {
     name: 'hol.detectProtocol',
     description: 'Detect the expected protocol for an inbound request payload.',
     schema: detectProtocolInput,
     handler: (input) =>
-      runBrokerCall('hol.detectProtocol', () => withBroker((client) => client.detectProtocol(input as any))),
+      runBrokerCall('hol.detectProtocol', () => withBroker((client) => client.detectProtocol(input as any), 'hol.detectProtocol')),
   },
   {
     name: 'hol.stats',
     description: 'High-level registry statistics and usage metrics.',
     schema: emptyObject,
-    handler: () => withBroker((client) => client.stats()),
+    handler: () => withBroker((client) => client.stats(), 'hol.stats'),
   },
   {
     name: 'hol.metricsSummary',
     description: 'Aggregated broker metrics suitable for dashboards.',
     schema: emptyObject,
-    handler: () => withBroker((client) => client.metricsSummary()),
+    handler: () => withBroker((client) => client.metricsSummary(), 'hol.metricsSummary'),
   },
   {
     name: 'hol.dashboardStats',
     description: 'Detailed dashboard statistics from the broker.',
     schema: emptyObject,
-    handler: () => withBroker((client) => client.dashboardStats()),
+    handler: () => withBroker((client) => client.dashboardStats(), 'hol.dashboardStats'),
   },
   {
     name: 'hol.websocketStats',
     description: 'Retrieve websocket connection counts and throughput.',
     schema: emptyObject,
-    handler: () => withBroker((client) => client.websocketStats()),
+    handler: () => withBroker((client) => client.websocketStats(), 'hol.websocketStats'),
   },
   {
     name: 'hol.ledger.challenge',
     description: 'Create a ledger challenge message for account verification.',
     schema: ledgerChallengeInput,
-    handler: (input) => withBroker((client) => client.createLedgerChallenge(input as LedgerChallengeRequest)),
+    handler: (input) => withBroker((client) => client.createLedgerChallenge(input as LedgerChallengeRequest), 'hol.ledger.challenge'),
   },
   {
     name: 'hol.ledger.authenticate',
     description: 'Verify a signed ledger challenge (sets ledger API key).',
     schema: ledgerVerifyInput,
-    handler: (input) => withBroker((client) => client.verifyLedgerChallenge(input as LedgerVerifyRequest)),
+    handler: (input) => withBroker((client) => client.verifyLedgerChallenge(input as LedgerVerifyRequest), 'hol.ledger.authenticate'),
   },
   {
     name: 'hol.purchaseCredits.hbar',
     description: 'Purchase registry credits using HBAR funds.',
     schema: purchaseHbarInput,
-    handler: (input) => withBroker((client) => client.purchaseCreditsWithHbar(input)),
+    handler: (input) => withBroker((client) => client.purchaseCreditsWithHbar(input), 'hol.purchaseCredits.hbar'),
   },
   {
     name: 'hol.credits.balance',
@@ -394,13 +440,13 @@ export const toolDefinitions: ToolDefinition[] = [
     name: 'hol.x402.minimums',
     description: 'Fetch the minimum credit purchase requirements for X402.',
     schema: emptyObject,
-    handler: () => withBroker((client) => client.getX402Minimums()),
+    handler: () => withBroker((client) => client.getX402Minimums(), 'hol.x402.minimums'),
   },
   {
     name: 'hol.x402.buyCredits',
     description: 'Buy registry credits via X402 using an EVM private key.',
     schema: buyX402Input,
-    handler: (input) => withBroker((client) => client.buyCreditsWithX402(input)),
+    handler: (input) => withBroker((client) => client.buyCreditsWithX402(input), 'hol.x402.buyCredits'),
   },
   {
     name: 'workflow.discovery',
@@ -654,7 +700,7 @@ mcp.addResource({
         'Prefer workflow.* pipelines when available—they run multiple broker calls and return both a text summary and structured results:',
         '- Discovery: workflow.discovery { query?, limit? } (or hol.search / hol.vectorSearch).',
         '- Registration: workflow.registerMcp { payload } (quote → register → wait) or workflow.fullRegistration to add discovery/chat/ops.',
-        '- Chat: hol.chat.createSession { uaid, auth? } → hol.chat.sendMessage { sessionId, message, auth? } → hol.chat.history/compact/end.',
+        '- Chat: hol.chat.createSession { uaid or agentUrl, auth?, historyTtlSeconds? } → hol.chat.sendMessage { sessionId OR (uaid/agentUrl), message, auth?, streaming? } → hol.chat.history/compact/end.',
         '- UAID validation/resets: hol.resolveUaid { uaid }, hol.closeUaidConnection { uaid }.',
         '- Ops/metrics: workflow.opsCheck or hol.stats / hol.metricsSummary / hol.dashboardStats.',
         '- Credits: hol.credits.balance first, then hol.purchaseCredits.hbar or hol.x402.buyCredits (X402 requires evmPrivateKey; call hol.x402.minimums to inspect limits).',

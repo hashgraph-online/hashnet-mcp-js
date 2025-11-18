@@ -38,20 +38,25 @@ Claude Desktop (stdio):
 
 ```json
 {
-  "mcpServers": {
-    "hashgraph-standards": {
-      "command": "pnpm",
-      "args": ["dev:stdio"],
-      "env": {
-        "REGISTRY_BROKER_API_URL": "https://registry.hashgraphonline.com/api/v1",
-        "REGISTRY_BROKER_API_KEY": "YOUR_KEY"
-      }
+  "hashnet": {
+    "type": "stdio",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@hol-org/hashnet-mcp",
+      "up"
+    ],
+    "env": {
+      "REGISTRY_BROKER_API_KEY": "x",
+      "REGISTRY_BROKER_API_URL": "https://registry.hashgraphonline.com/api/v1"
     }
   }
 }
 ```
 
 Claude Code / Cursor (HTTP streaming): point the client at `https://<host>/mcp/stream` once deployed (see `deploy/README.md`). Use `pnpm dev:sse` locally to expose the same endpoint at `http://localhost:3333/mcp/stream`. SSE fallback remains available at `/mcp/sse` for clients that still require it.
+
+Local CLI runner (no global install): `pnpm cli:up -- --transport sse` (runs TS directly). Built bundle: `pnpm build && node dist/cli/up.js up --transport sse`. Global/NPX: `npx @hol-org/hashnet-mcp up --transport sse`.
 
 #### Claude Code auto-install
 - `pnpm claude:install --endpoint http://localhost:3333/mcp/stream` — adds/updates the MCP entry inside Claude Code’s config (`~/Library/Application Support/Claude/claude_code_config.json` on macOS; `%APPDATA%\Claude\claude_code_config.json` on Windows; `~/.config/Claude/claude_code_config.json` on Linux).

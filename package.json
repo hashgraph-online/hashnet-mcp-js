@@ -1,7 +1,7 @@
 {
   "name": "@hol-org/hashnet-mcp",
   "version": "1.0.10",
-  "description": "FastMCP server exposing Hashgraph Online Registry Broker tooling.",
+  "description": "HOL MCP server for agentic search, discovery, registration, chat, and more with the Hashgraph Online Registry Broker.",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -31,6 +31,7 @@
   "scripts": {
     "dev:stdio": "MCP_TRANSPORT=stdio tsx src/index.ts",
     "dev:sse": "tsx src/index.ts",
+    "cli:up": "tsx src/cli/up.ts",
     "build": "tsup --config tsup.config.ts",
     "start": "node dist/index.js",
     "quickstart": "tsx scripts/quickstart.ts",

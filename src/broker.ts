@@ -1,4 +1,4 @@
-import { RegistryBrokerClient } from '@hashgraphonline/standards-sdk';
+import { RegistryBrokerClient, RegistryBrokerError } from '@hashgraphonline/standards-sdk';
 import Bottleneck from 'bottleneck';
 import IORedis from 'ioredis';
 import { fetch as undiciFetch } from 'undici';
@@ -58,11 +58,21 @@ function createLimiter() {
 
 type BrokerTask<T> = (client: RegistryBrokerClient) => Promise<T>;
 
-export async function withBroker<T>(task: BrokerTask<T>): Promise<T> {
+export async function withBroker<T>(task: BrokerTask<T>, label?: string): Promise<T> {
+  const run = async () => {
+    if (!config.registryBrokerApiKey) {
+      throw new Error('REGISTRY_BROKER_API_KEY is required to call the registry broker. Set it in your environment or .env file.');
+    }
+    try {
+      return await task(broker);
+    } catch (error) {
+      throw formatBrokerError(error, label);
+    }
+  };
   if (brokerLimiter) {
-    return brokerLimiter.schedule(() => task(broker));
+    return brokerLimiter.schedule(run);
   }
-  return task(broker);
+  return run();
 }
 
 export { broker, brokerLimiter };
@@ -107,4 +117,19 @@ async function safeReadBody(response: Response) {
   } catch {
     return undefined;
   }
+}
+
+function formatBrokerError(error: unknown, label?: string): Error {
+  if (error instanceof RegistryBrokerError) {
+    const body =
+      typeof error.body === 'object'
+        ? JSON.stringify(error.body)
+        : error.body
+          ? String(error.body)
+          : 'no response body';
+    const statusText = error.statusText ? ` ${error.statusText}` : '';
+    const prefix = label ? `${label} failed` : 'Registry broker request failed';
+    return new Error(`${prefix} (${error.status}${statusText}): ${body}`);
+  }
+  return error instanceof Error ? error : new Error(String(error));
 }

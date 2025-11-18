@@ -35,6 +35,17 @@ type UpdateAgentPayload = Parameters<RegistryBrokerClient['updateAgent']>[1];
 type RegistrySearchNamespaceArgs = Parameters<RegistryBrokerClient['registrySearchByNamespace']>;
 type PurchaseHbarPayload = PurchaseCreditsWithHbarParams;
 
+const connectionInstructions = [
+  'You expose the Hashgraph Online Registry Broker via hol.* primitives and workflow.* pipelines. Prefer workflow.* when possible—they bundle common steps and return a pipeline summary plus full results.',
+  'Discovery: use workflow.discovery (or hol.search / hol.vectorSearch) to find UAIDs/agents/MCP servers; pass q/query and optional filters like capabilities, metadata, or type=ai-agents|mcp-servers.',
+  'Registration: workflow.registerMcp (quote → register → wait) is the default; workflow.fullRegistration adds discovery/chat/ops. hol.registerAgent + hol.waitForRegistrationCompletion are the lower-level primitives.',
+  'Chat: call hol.resolveUaid if the UAID is unverified, then hol.chat.createSession (include auth if provided) followed by hol.chat.sendMessage. Use hol.chat.history/compact/end to manage the session.',
+  'Operations: workflow.opsCheck or hol.stats/hol.metricsSummary/hol.dashboardStats show registry health; hol.listProtocols + hol.detectProtocol help route third-party requests.',
+  'Credits: check hol.credits.balance before purchases. Use hol.purchaseCredits.hbar or hol.x402.buyCredits only with explicit user approval (X402 requires an EVM key); hol.x402.minimums provides thresholds.',
+  'Always include UAIDs/sessionIds exactly as given and echo any auth headers/tokens the user supplies. If required fields are missing (UAID, payload, accountId), ask for them before calling tools.',
+  'Additional help resources: help://rb/search documents hol.search filters; help://hol/usage lists common recipes.',
+].join('\n');
+
 const agentAuthSchema: z.ZodType<AgentAuthConfig> = z
   .object({
     type: z.enum(['bearer', 'basic', 'header', 'apiKey']).optional(),
@@ -43,7 +54,7 @@ const agentAuthSchema: z.ZodType<AgentAuthConfig> = z
     password: z.string().optional(),
     headerName: z.string().optional(),
     headerValue: z.string().optional(),
-  headers: z.record(z.string(), z.string()).optional(),
+    headers: z.record(z.string(), z.string()).optional(),
   })
   .partial() as z.ZodType<AgentAuthConfig>;
 
@@ -182,6 +193,15 @@ export const mcp = new FastMCP({
   name: 'hashgraph-standards',
   version: '1.0.0',
   description: 'MCP tools exposing Hashgraph Online Registry Broker via standards-sdk',
+  instructions: connectionInstructions,
+  // Route FastMCP logging to our pino logger (stderr) to keep stdio transport clean.
+  logger: {
+    debug: (...args: unknown[]) => logger.debug(args),
+    info: (...args: unknown[]) => logger.info(args),
+    warn: (...args: unknown[]) => logger.warn(args),
+    error: (...args: unknown[]) => logger.error(args),
+    log: (...args: unknown[]) => logger.info(args),
+  },
 });
 
 type ToolDefinition<Schema extends z.ZodTypeAny = z.ZodTypeAny> = {
@@ -476,7 +496,6 @@ function formatPipelineResult(result: PipelineRunResult<unknown>) {
       { type: 'text', text: summaryLines.join('\n') },
       buildObjectContent('pipeline.result', result),
     ],
-    structuredContent: result,
   };
 }
 
@@ -537,14 +556,12 @@ function normalizeResult(value: unknown): { content: Content[]; structuredConten
     const record = value as Record<string, unknown>;
     return {
       content: normalizeContent(record.content),
-      structuredContent: isPlainObject(record.structuredContent) ? (record.structuredContent as Record<string, unknown>) : undefined,
       isError: typeof record.isError === 'boolean' ? (record.isError as boolean) : undefined,
     };
   }
   if (isPlainObject(value)) {
     return {
       content: [buildObjectContent('tool.result', value as Record<string, unknown>)],
-      structuredContent: value as Record<string, unknown>,
     };
   }
   return { content: normalizeContent(value) };
@@ -620,6 +637,30 @@ mcp.addResource({
         '- `capabilities`: filter by declared skills',
         '- `metadata`: pass `{ \"region\": [\"na\"] }` style filters',
         '- `type`: limit results to `ai-agents` or `mcp-servers`',
+      ].join('\n'),
+    },
+  ],
+});
+
+mcp.addResource({
+  name: 'hol.tools.guide',
+  uri: 'help://hol/usage',
+  mimeType: 'text/markdown',
+  load: async () => [
+    {
+      text: [
+        '# Hashnet MCP quick usage',
+        '',
+        'Prefer workflow.* pipelines when available—they run multiple broker calls and return both a text summary and structured results:',
+        '- Discovery: workflow.discovery { query?, limit? } (or hol.search / hol.vectorSearch).',
+        '- Registration: workflow.registerMcp { payload } (quote → register → wait) or workflow.fullRegistration to add discovery/chat/ops.',
+        '- Chat: hol.chat.createSession { uaid, auth? } → hol.chat.sendMessage { sessionId, message, auth? } → hol.chat.history/compact/end.',
+        '- UAID validation/resets: hol.resolveUaid { uaid }, hol.closeUaidConnection { uaid }.',
+        '- Ops/metrics: workflow.opsCheck or hol.stats / hol.metricsSummary / hol.dashboardStats.',
+        '- Credits: hol.credits.balance first, then hol.purchaseCredits.hbar or hol.x402.buyCredits (X402 requires evmPrivateKey; call hol.x402.minimums to inspect limits).',
+        '- Protocols: hol.listProtocols and hol.detectProtocol when inspecting inbound requests.',
+        '',
+        'Ask the user for any missing UAID, registration payload fields, accountId, or auth tokens before calling tools. Keep sessionId/uaid strings verbatim.',
       ].join('\n'),
     },
   ],

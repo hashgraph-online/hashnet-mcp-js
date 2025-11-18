@@ -2,8 +2,8 @@
   "mcpServers": {
     "hashnet-mcp": {
       "enabled": true,
-      "type": "sse",
-      "url": "http://localhost:3333/mcp/sse"
+      "type": "http",
+      "url": "http://localhost:3334/mcp/stream"
     }
   }
 }

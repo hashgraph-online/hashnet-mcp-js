@@ -1,6 +1,6 @@
 {
   "name": "@hol-org/hashnet-mcp",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "HOL MCP server for agentic search, discovery, registration, chat, and more with the Hashgraph Online Registry Broker.",
   "type": "module",
   "main": "./dist/index.js",

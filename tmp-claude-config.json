@@ -1,13 +1,16 @@
 {
   "mcpServers": {
-    "hashnet-mcp": {
-      "transport": {
-        "type": "sse",
-        "url": "http://localhost:3333/mcp/sse"
-      },
-      "command": null,
-      "metadata": {
-        "description": "Hashnet MCP (Registry Broker via FastMCP HTTP transport)"
+    "hashnet": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@hol-org/hashnet-mcp",
+        "up"
+      ],
+      "env": {
+        "REGISTRY_BROKER_API_URL": "https://registry.hashgraphonline.com/api/v1",
+        "REGISTRY_BROKER_API_KEY": "x"
       }
     }
   }

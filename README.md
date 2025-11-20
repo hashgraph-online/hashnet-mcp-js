@@ -97,6 +97,7 @@ Categories are exposed as MCP tools (`hol.*`) plus workflows (`workflow.*`):
 - **Protocols/Ops**: `hol.listProtocols`, `hol.detectProtocol`, `hol.stats`, `hol.metricsSummary`, `hol.dashboardStats`, `hol.websocketStats`
 - **Credits**: `hol.credits.balance`, `hol.purchaseCredits.hbar`, `hol.x402.minimums`, `hol.x402.buyCredits`
 - **Ledger**: `hol.ledger.challenge`, `hol.ledger.authenticate`
+- **Memory (optional)**: `hol.memory.put`, `hol.memory.get`, `hol.memory.list`, `hol.memory.delete`, `hol.memory.clear` (enable with `MEMORY_ENABLED=1`)
 - **Workflows** (pipelines): discovery, registration, full registration, chat smoke, ops check, ERC-8004 and X402 helpers, OpenRouter chat, registry showcase, Agentverse bridge. See `examples/workflows/` for payloads.
 
 ## Usage patterns
@@ -105,6 +106,8 @@ Categories are exposed as MCP tools (`hol.*`) plus workflows (`workflow.*`):
 - **Chat**: Start with `hol.chat.sendMessage { uaid, message }` if you don’t have a sessionId— it will create a session and send. Otherwise use `hol.chat.createSession` then `hol.chat.sendMessage { sessionId, message }`. Manage with `hol.chat.history/compact/end`.
 - **Ops/Health**: `workflow.opsCheck` or the `hol.stats`/`hol.metricsSummary`/`hol.dashboardStats` trio.
 - **Credits**: Always check `hol.credits.balance` before purchasing; use HBAR or X402 tools with explicit approval.
+- **Memory (optional)**: Enable with `MEMORY_ENABLED=1` to persist contextual blobs per scope/tag with `hol.memory.put/get/list/delete/clear` (supports per-write `ttlSeconds` and store bounds via `MEMORY_MAX_ITEMS`).
+  - Bonus: when memory is on, chat tools auto-reuse remembered sessions for a UAID/agentUrl and remember newly created sessions; `hol.chat.end` clears cached sessions.
 
 ## Tool catalog (what each does)
 **Discovery**
@@ -139,16 +142,31 @@ Categories are exposed as MCP tools (`hol.*`) plus workflows (`workflow.*`):
 - `hol.ledger.challenge` — create ledger verification challenge.
 - `hol.ledger.authenticate` — verify challenge (sets ledger API key).
 
+**Memory (optional)**
+- `hol.memory.put/get/list/delete/clear` — lightweight scoped store with tags and TTL. Requires `MEMORY_ENABLED=1`.
+
 **Workflows (pipelines)**
 - Discovery: `workflow.discovery`, `workflow.erc8004Discovery`
 - Registration: `workflow.registerMcp`, `workflow.fullRegistration`, `workflow.erc8004X402`, `workflow.x402Registration`, `workflow.registerAgentErc8004`
 - Chat/Ops: `workflow.chatSmoke`, `workflow.opsCheck`, `workflow.registryBrokerShowcase`, `workflow.openrouterChat`, `workflow.agentverseBridge`
 - Utilities: see `examples/workflows/` for payloads and `pnpm workflow:list`
 
+## Memory store (optional)
+- Opt-in with `MEMORY_ENABLED=1` (defaults off). Tunables: `MEMORY_TTL_SECONDS` (default TTL per entry) and `MEMORY_MAX_ITEMS` (bounded store with oldest eviction).
+- Use scopes to group data (e.g., `uaid`, `session`, `user`), tags for quick filtering, and per-write `ttlSeconds` to tighten retention.
+- Tools:
+  - `hol.memory.put { key, value, scope?, tags?, ttlSeconds? }`
+  - `hol.memory.get { key, scope? }`
+  - `hol.memory.list { scope?, tag?, limit? }`
+  - `hol.memory.delete { key, scope? }`
+  - `hol.memory.clear { scope? }` (clears a scope or everything)
+- Backed by an in-memory store with TTL + eviction; when disabled, tools will error with a setup hint so you can flip the flag.
+
 ## Environment
 Set in `.env` or your process:
 - `REGISTRY_BROKER_API_URL` (default `https://registry.hashgraphonline.com/api/v1`)
 - `REGISTRY_BROKER_API_KEY` (required for live broker)
+- Memory toggles (optional): `MEMORY_ENABLED`, `MEMORY_TTL_SECONDS`, `MEMORY_MAX_ITEMS`
 - Optional: `HEDERA_ACCOUNT_ID`, `HEDERA_PRIVATE_KEY` (auto top-up), `LOG_LEVEL`, `PORT`, `HTTP_STREAM_PORT`, `BROKER_*` rate limit vars, `WORKFLOW_DRY_RUN`, `BROKER_AUTO_TOP_UP`.
 
 ## Testing & quality
@@ -163,4 +181,3 @@ Set in `.env` or your process:
 ## Logging & observability
 - `pino` structured logs; set `LOG_LEVEL=fatal|error|warn|info|debug|trace`.
 - Each tool call logs requestId + duration. SSE/HTTP transport logs requests. Credits/registration calls surface broker status/body on failure.
-

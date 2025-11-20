@@ -60,7 +60,7 @@ type BrokerTask<T> = (client: RegistryBrokerClient) => Promise<T>;
 
 export async function withBroker<T>(task: BrokerTask<T>, label?: string): Promise<T> {
   const run = async () => {
-    if (!config.registryBrokerApiKey) {
+    if (!config.registryBrokerApiKey && process.env.NODE_ENV !== 'test') {
       throw new Error('REGISTRY_BROKER_API_KEY is required to call the registry broker. Set it in your environment or .env file.');
     }
     try {

@@ -33,6 +33,12 @@ const envSchema = z
       .optional()
       .transform((value) => value === '1'),
     HTTP_STREAM_PORT: z.coerce.number().int().positive().optional(),
+    MEMORY_ENABLED: z
+      .enum(['0', '1'])
+      .optional()
+      .transform((value) => value === '1'),
+    MEMORY_TTL_SECONDS: z.coerce.number().positive().optional(),
+    MEMORY_MAX_ITEMS: z.coerce.number().int().positive().optional(),
   })
   .superRefine((val, ctx) => {
     const hasAccount = Boolean(val.HEDERA_ACCOUNT_ID);
@@ -67,6 +73,9 @@ const parsed = envSchema.safeParse({
   WORKFLOW_DRY_RUN: normalized(process.env.WORKFLOW_DRY_RUN),
   BROKER_AUTO_TOP_UP: normalized(process.env.BROKER_AUTO_TOP_UP),
   HTTP_STREAM_PORT: normalized(process.env.HTTP_STREAM_PORT),
+  MEMORY_ENABLED: normalized(process.env.MEMORY_ENABLED),
+  MEMORY_TTL_SECONDS: normalized(process.env.MEMORY_TTL_SECONDS),
+  MEMORY_MAX_ITEMS: normalized(process.env.MEMORY_MAX_ITEMS),
 });
 
 if (!parsed.success) {
@@ -112,6 +121,11 @@ export const config = {
   workflowDryRun: parsed.data.WORKFLOW_DRY_RUN ?? false,
   httpStreamPort: parsed.data.HTTP_STREAM_PORT,
   logLevel: parsed.data.LOG_LEVEL,
+  memory: {
+    enabled: parsed.data.MEMORY_ENABLED ?? false,
+    ttlMs: parsed.data.MEMORY_TTL_SECONDS ? parsed.data.MEMORY_TTL_SECONDS * 1000 : undefined,
+    maxItems: parsed.data.MEMORY_MAX_ITEMS,
+  },
 };
 
 export type AppConfig = typeof config;

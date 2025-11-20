@@ -4,6 +4,8 @@ import { withBroker } from '../broker';
 import { discoveryPipeline } from './discovery';
 import { chatPipeline } from './chat';
 import { opsPipeline } from './ops';
+import { RegistryBrokerError } from '@hashgraphonline/standards-sdk';
+import { logger } from '../logger';
 
 export interface RegistryShowcaseInput {
   query?: string;
@@ -46,18 +48,38 @@ const registryShowcaseDefinition: PipelineDefinition<RegistryShowcaseInput, Regi
       name: 'hol.listProtocols',
       allowDuringDryRun: true,
       run: async ({ context }) => {
-        const response = await withBroker((client) => client.listProtocols());
-        context.listProtocols = response;
-        return response;
+        try {
+          const response = await withBroker((client) => client.listProtocols());
+          context.listProtocols = response;
+          return response;
+        } catch (error) {
+          if (error instanceof RegistryBrokerError && error.status === 404) {
+            logger.warn({ error: error.body }, 'registry-showcase.protocols.unavailable');
+            const msg = { warning: 'Protocol listing not available on this broker (404)' };
+            context.listProtocols = msg;
+            return msg;
+          }
+          throw error;
+        }
       },
     },
     {
       name: 'hol.detectProtocol',
       allowDuringDryRun: true,
       run: async ({ context }) => {
-        const response = await withBroker((client) => client.detectProtocol({ headers: { 'content-type': 'application/json' }, body: '{}' }));
-        context.detectProtocol = response;
-        return response;
+        try {
+          const response = await withBroker((client) => client.detectProtocol({ headers: { 'content-type': 'application/json' }, body: '{}' }));
+          context.detectProtocol = response;
+          return response;
+        } catch (error) {
+          if (error instanceof RegistryBrokerError && error.status === 404) {
+            logger.warn({ error: error.body }, 'registry-showcase.detectProtocol.unavailable');
+            const msg = { warning: 'Protocol detection not available on this broker (404)' };
+            context.detectProtocol = msg;
+            return msg;
+          }
+          throw error;
+        }
       },
     },
     {

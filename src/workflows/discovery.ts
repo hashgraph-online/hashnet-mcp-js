@@ -1,6 +1,8 @@
 import { registerPipeline } from './registry';
 import type { PipelineDefinition } from './types';
 import { withBroker } from '../broker';
+import { RegistryBrokerParseError } from '@hashgraphonline/standards-sdk';
+import { logger } from '../logger';
 
 interface DiscoveryInput {
   query?: string;
@@ -40,9 +42,25 @@ const discoveryDefinition: PipelineDefinition<DiscoveryInput, DiscoveryContext> 
         if (!input.query) {
           return undefined;
         }
-        const response = await withBroker((client) => client.vectorSearch({ query: input.query, limit: input.limit ?? 5 }));
-        context.results.vector = response;
-        return response;
+        try {
+          const response = await withBroker((client) => client.vectorSearch({ query: input.query, limit: input.limit ?? 5 }));
+          context.results.vector = response;
+          return response;
+        } catch (error) {
+          if (error instanceof RegistryBrokerParseError || String(error).includes('parse vector search')) {
+            logger.warn(
+              { error: error instanceof Error ? error.message : String(error) },
+              'workflow.discovery.vector.parse_failed',
+            );
+            const fallback = {
+              error: 'Vector search unavailable (parse error from broker). Falling back to keyword search results only.',
+              detail: error instanceof Error ? error.message : String(error),
+            };
+            context.results.vector = fallback;
+            return fallback;
+          }
+          throw error;
+        }
       },
     },
   ],

@@ -6,6 +6,7 @@ import {
   PurchaseCreditsWithHbarParams,
   RegistryBrokerClient,
   RegistryBrokerError,
+  RegistryBrokerParseError,
 } from '@hashgraphonline/standards-sdk';
 import { FastMCP } from 'fastmcp';
 import type { Context, Content } from 'fastmcp';
@@ -13,6 +14,7 @@ import { z } from 'zod';
 import { getCreditBalance, withBroker } from './broker';
 import { config } from './config';
 import { logger } from './logger';
+import { MEMORY_ENABLED, memoryStore } from './memory';
 import { agentRegistrationSchema } from './schemas/agent';
 import { discoveryPipeline } from './workflows/discovery';
 import { registrationPipeline } from './workflows/registration';
@@ -42,6 +44,7 @@ const connectionInstructions = [
   'Chat: call hol.resolveUaid if the UAID is unverified, then hol.chat.createSession (uaid or agentUrl + optional auth) followed by hol.chat.sendMessage (sessionId or uaid/agentUrl). Use hol.chat.history/compact/end to manage the session.',
   'Operations: workflow.opsCheck or hol.stats/hol.metricsSummary/hol.dashboardStats show registry health; hol.listProtocols + hol.detectProtocol help route third-party requests.',
   'Credits: check hol.credits.balance before purchases. Use hol.purchaseCredits.hbar or hol.x402.buyCredits only with explicit user approval (X402 requires an EVM key); hol.x402.minimums provides thresholds.',
+  `Memory (optional): if MEMORY_ENABLED=1, use hol.memory.put/get/list/delete/clear to persist context (scopes + TTL) across tool calls.`,
   'Always include UAIDs/sessionIds exactly as given and echo any auth headers/tokens the user supplies. If required fields are missing (UAID, payload, accountId), ask for them before calling tools.',
   'Additional help resources: help://rb/search documents hol.search filters; help://hol/usage lists common recipes.',
 ].join('\n');
@@ -205,6 +208,81 @@ const buyX402Input = z.object({
   rpcUrl: z.string().url().optional(),
 });
 
+const memoryPutInput = z.object({
+  key: z.string().min(1),
+  scope: z.string().min(1).optional(),
+  value: z.any(),
+  tags: z.array(z.string()).max(20).optional(),
+  ttlSeconds: z.number().int().positive().optional(),
+});
+
+const memoryGetInput = z.object({
+  key: z.string().min(1),
+  scope: z.string().min(1).optional(),
+});
+
+const memoryDeleteInput = z.object({
+  key: z.string().min(1),
+  scope: z.string().min(1).optional(),
+});
+
+const memoryListInput = z.object({
+  scope: z.string().min(1).optional(),
+  tag: z.string().min(1).optional(),
+  limit: z.number().int().positive().max(200).optional(),
+});
+
+const memoryClearInput = z.object({
+  scope: z.string().min(1).optional(),
+});
+
+function chatMemoryKey(uaid?: string, agentUrl?: string) {
+  return uaid ?? agentUrl ?? undefined;
+}
+
+async function rememberChatSession(params: { uaid?: string; agentUrl?: string; sessionId: string }) {
+  if (!MEMORY_ENABLED) return;
+  const key = chatMemoryKey(params.uaid, params.agentUrl);
+  if (!key) return;
+  await memoryStore.put({
+    key: `chat-session:${key}`,
+    scope: 'chat',
+    value: {
+      sessionId: params.sessionId,
+      uaid: params.uaid,
+      agentUrl: params.agentUrl,
+    },
+    tags: ['chat', 'session'],
+  });
+}
+
+async function forgetChatSession(params: { uaid?: string; agentUrl?: string }) {
+  if (!MEMORY_ENABLED) return;
+  const key = chatMemoryKey(params.uaid, params.agentUrl);
+  if (!key) return;
+  await memoryStore.delete(`chat-session:${key}`, 'chat');
+}
+
+async function recallChatSession(params: { uaid?: string; agentUrl?: string }): Promise<string | null> {
+  if (!MEMORY_ENABLED) return null;
+  const key = chatMemoryKey(params.uaid, params.agentUrl);
+  if (!key) return null;
+  const entry = await memoryStore.get(`chat-session:${key}`, 'chat');
+  const sessionId = (entry?.value as any)?.sessionId;
+  return typeof sessionId === 'string' && sessionId.length > 0 ? sessionId : null;
+}
+
+async function dropSessionById(sessionId: string) {
+  if (!MEMORY_ENABLED) return;
+  const entries = await memoryStore.list({ scope: 'chat' });
+  for (const entry of entries) {
+    const valueSessionId = (entry.value as any)?.sessionId;
+    if (valueSessionId === sessionId) {
+      await memoryStore.delete(entry.key, 'chat');
+    }
+  }
+}
+
 export const mcp = new FastMCP({
   name: 'hashgraph-standards',
   version: '1.0.0',
@@ -227,6 +305,30 @@ type ToolDefinition<Schema extends z.ZodTypeAny = z.ZodTypeAny> = {
   handler: (input: z.infer<Schema>) => Promise<unknown>;
 };
 
+function assertMemoryEnabled(toolName: string) {
+  if (!MEMORY_ENABLED) {
+    throw new Error(`${toolName} requires MEMORY_ENABLED=1 (disabled by default). Set MEMORY_ENABLED=1 and optionally MEMORY_TTL_SECONDS / MEMORY_MAX_ITEMS to activate the store.`);
+  }
+}
+
+function friendlyVectorSearchError(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : 'Vector search unavailable';
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `Vector search failed to parse the broker response. Falling back to keyword search.\nReason: ${message}`,
+      },
+    ],
+    isError: true,
+  };
+}
+
 export const toolDefinitions: ToolDefinition[] = [
   {
     name: 'hol.search',
@@ -238,7 +340,17 @@ export const toolDefinitions: ToolDefinition[] = [
     name: 'hol.vectorSearch',
     description: 'Vector similarity search across registered agents.',
     schema: vectorSearchInput,
-    handler: (input) => withBroker((client) => client.vectorSearch(input), 'hol.vectorSearch'),
+    handler: async (input) => {
+      try {
+        return await withBroker((client) => client.vectorSearch(input), 'hol.vectorSearch');
+      } catch (error) {
+        if (error instanceof RegistryBrokerParseError || String(error).includes('parse vector search')) {
+          logger.warn({ error: error instanceof Error ? error.message : String(error) }, 'hol.vectorSearch.parse_failed');
+          return friendlyVectorSearchError(error);
+        }
+        throw error;
+      }
+    },
   },
   {
     name: 'hol.resolveUaid',
@@ -308,7 +420,30 @@ export const toolDefinitions: ToolDefinition[] = [
     name: 'hol.chat.createSession',
     description: 'Open a chat session linked to a UAID.',
     schema: chatSessionSchema,
-    handler: (input) => withBroker((client) => client.chat.createSession(input), 'hol.chat.createSession'),
+    handler: (input) =>
+      withBroker(async (client) => {
+        try {
+          const session = await client.chat.createSession(input);
+          const sessionId = (session as any).sessionId ?? (session as any).id;
+          if (sessionId) {
+            await rememberChatSession({ uaid: (input as any).uaid, agentUrl: (input as any).agentUrl, sessionId });
+          }
+          return session;
+        } catch (error) {
+          if (error instanceof RegistryBrokerError && error.status === 404) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: 'Chat session endpoint unavailable on this broker (404 Not Found). This agent/registry may not support broker-routed chat.',
+                },
+              ],
+              isError: true,
+            };
+          }
+          throw error;
+        }
+      }, 'hol.chat.createSession'),
   },
   {
     name: 'hol.chat.sendMessage',
@@ -316,25 +451,27 @@ export const toolDefinitions: ToolDefinition[] = [
     schema: chatMessageSchema,
     handler: (input) =>
       withBroker(async (client) => {
-        if (input.sessionId) {
-          return client.chat.sendMessage(input);
-        }
-
         const uaid = (input as any).uaid;
         const agentUrl = (input as any).agentUrl;
-        if (!uaid && !agentUrl) {
-          throw new Error('sessionId missing; provide uaid or agentUrl so a session can be created before sending.');
-        }
-
-        // Auto-create a session when callers only supply a UAID/agentUrl.
-        const session = await client.chat.createSession({
-          uaid,
-          agentUrl,
-          auth: input.auth,
-        } as any);
-        const sessionId = (session as any).sessionId ?? (session as any).id;
+        // Prefer provided sessionId; otherwise recall cached chat session; otherwise create and persist one.
+        let sessionId = input.sessionId;
         if (!sessionId) {
-          throw new Error('Unable to determine sessionId from broker response when auto-creating chat session.');
+          sessionId = await recallChatSession({ uaid, agentUrl });
+        }
+        if (!sessionId) {
+          if (!uaid && !agentUrl) {
+            throw new Error('sessionId missing; provide uaid or agentUrl so a session can be created before sending.');
+          }
+          const session = await client.chat.createSession({
+            uaid,
+            agentUrl,
+            auth: input.auth,
+          } as any);
+          sessionId = (session as any).sessionId ?? (session as any).id;
+          if (!sessionId) {
+            throw new Error('Unable to determine sessionId from broker response when auto-creating chat session.');
+          }
+          await rememberChatSession({ uaid, agentUrl, sessionId });
         }
 
         return client.chat.sendMessage({
@@ -361,7 +498,70 @@ export const toolDefinitions: ToolDefinition[] = [
     name: 'hol.chat.end',
     description: 'End a chat session and release broker resources.',
     schema: sessionIdInput,
-    handler: ({ sessionId }) => withBroker((client) => client.chat.endSession(sessionId), 'hol.chat.end'),
+    handler: ({ sessionId }) =>
+      withBroker(async (client) => {
+        await client.chat.endSession(sessionId);
+        if (MEMORY_ENABLED) {
+          await dropSessionById(sessionId);
+        }
+        return { ended: true };
+      }, 'hol.chat.end'),
+  },
+  {
+    name: 'hol.memory.put',
+    description: 'Persist a memory payload with optional scope/tags/TTL (requires MEMORY_ENABLED=1).',
+    schema: memoryPutInput,
+    handler: async (input) => {
+      assertMemoryEnabled('hol.memory.put');
+      const entry = await memoryStore.put({
+        key: input.key,
+        scope: input.scope,
+        value: input.value,
+        tags: input.tags,
+        ttlMs: input.ttlSeconds ? input.ttlSeconds * 1000 : undefined,
+      });
+      return entry;
+    },
+  },
+  {
+    name: 'hol.memory.get',
+    description: 'Retrieve a memory payload by key/scope (requires MEMORY_ENABLED=1).',
+    schema: memoryGetInput,
+    handler: async (input) => {
+      assertMemoryEnabled('hol.memory.get');
+      const entry = await memoryStore.get(input.key, input.scope);
+      return entry ?? { message: 'not found' };
+    },
+  },
+  {
+    name: 'hol.memory.list',
+    description: 'List memory entries filtered by scope/tag (requires MEMORY_ENABLED=1).',
+    schema: memoryListInput,
+    handler: async (input) => {
+      assertMemoryEnabled('hol.memory.list');
+      const entries = await memoryStore.list({ scope: input.scope, tag: input.tag, limit: input.limit });
+      return { entries };
+    },
+  },
+  {
+    name: 'hol.memory.delete',
+    description: 'Delete a memory entry by key/scope (requires MEMORY_ENABLED=1).',
+    schema: memoryDeleteInput,
+    handler: async (input) => {
+      assertMemoryEnabled('hol.memory.delete');
+      const deleted = await memoryStore.delete(input.key, input.scope);
+      return { deleted };
+    },
+  },
+  {
+    name: 'hol.memory.clear',
+    description: 'Clear all memory entries or a scope (requires MEMORY_ENABLED=1).',
+    schema: memoryClearInput,
+    handler: async (input) => {
+      assertMemoryEnabled('hol.memory.clear');
+      const cleared = await memoryStore.clear(input.scope);
+      return { cleared };
+    },
   },
   {
     name: 'hol.listProtocols',

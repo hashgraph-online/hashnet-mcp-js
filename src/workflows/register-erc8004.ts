@@ -13,6 +13,7 @@ interface RegisterAgentErc8004Context {
   resolvedNetworks: string[];
   missingNetworks: string[];
   advancedResult?: unknown;
+  catalog?: AdditionalRegistryCatalogResponse;
 }
 
 const registerAgentErc8004Definition: PipelineDefinition<RegisterAgentErc8004Input, RegisterAgentErc8004Context> = {
@@ -25,13 +26,22 @@ const registerAgentErc8004Definition: PipelineDefinition<RegisterAgentErc8004Inp
     {
       name: 'hol.getAdditionalRegistries',
       allowDuringDryRun: true,
-      run: async () => withBroker((client) => client.getAdditionalRegistries()),
+      run: async ({ context }) => {
+        const catalog = await withBroker((client) => client.getAdditionalRegistries());
+        context.catalog = catalog;
+        return catalog;
+      },
     },
     {
       name: 'workflow.erc8004.resolveNetworks',
       allowDuringDryRun: true,
-      run: async ({ input, context }, catalog) => {
-        const response = catalog as AdditionalRegistryCatalogResponse;
+      run: async ({ input, context }) => {
+        const response = context.catalog;
+        if (!response) {
+          context.resolvedNetworks = [];
+          context.missingNetworks = [];
+          return { resolved: [], missing: [] };
+        }
         const selections = input.erc8004Networks?.length ? input.erc8004Networks : defaultErc8004Selections(response);
         const { resolved, missing } = resolveErc8004Selections(selections, response);
         context.resolvedNetworks = resolved;
@@ -65,20 +75,28 @@ const registerAgentErc8004Definition: PipelineDefinition<RegisterAgentErc8004Inp
 export const registerAgentErc8004Pipeline = scaffoldWorkflow(registerAgentErc8004Definition);
 
 function resolveErc8004Selections(selections: string[], catalog: AdditionalRegistryCatalogResponse) {
+  if (!catalog.registries || catalog.registries.length === 0) {
+    return { resolved: [], missing: selections };
+  }
   const resolved = new Set<string>();
   const missing: string[] = [];
   selections.forEach((entry) => {
     const normalized = entry.trim().toLowerCase();
     if (!normalized) return;
     let matched = false;
-    for (const descriptor of catalog.registries) {
-      if (!descriptor.id.toLowerCase().startsWith('erc-8004')) continue;
-      for (const network of descriptor.networks) {
+    for (const descriptor of catalog.registries ?? []) {
+      const descriptorId = descriptor.id?.toLowerCase();
+      const networks = descriptor.networks ?? [];
+      if (!descriptorId || !descriptorId.startsWith('erc-8004')) continue;
+      for (const network of networks) {
+        if (!network) continue;
         const candidates = [network.key, network.networkId, network.label, network.name]
           .map((value) => value?.toLowerCase().trim())
           .filter(Boolean);
-        if (candidates.includes(normalized) || `${descriptor.id.toLowerCase()}:${network.networkId?.toLowerCase()}` === normalized) {
-          resolved.add(network.key);
+        if (candidates.includes(normalized) || `${descriptorId}:${network.networkId?.toLowerCase()}` === normalized) {
+          if (network.key) {
+            resolved.add(network.key);
+          }
           matched = true;
         }
       }
@@ -91,9 +109,9 @@ function resolveErc8004Selections(selections: string[], catalog: AdditionalRegis
 }
 
 function defaultErc8004Selections(catalog: AdditionalRegistryCatalogResponse) {
-  const defaults = catalog.registries.find((entry) => entry.id.toLowerCase() === 'erc-8004');
-  if (!defaults) return [];
-  return defaults.networks.map((network) => network.key);
+  const defaults = catalog.registries?.find((entry) => entry.id?.toLowerCase() === 'erc-8004');
+  if (!defaults || !defaults.networks) return [];
+  return defaults.networks.map((network) => network?.key).filter((key): key is string => Boolean(key));
 }
 
 function withAdditionalRegistries(payload: AgentRegistrationRequest, networks: string[]) {

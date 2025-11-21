@@ -2,18 +2,23 @@ import { RegistryBrokerClient, RegistryBrokerError } from '@hashgraphonline/stan
 import Bottleneck from 'bottleneck';
 import IORedis from 'ioredis';
 import { fetch as undiciFetch } from 'undici';
+import type { Response as UndiciResponse } from 'undici';
 import { config } from './config';
+
+const autoTopUpConfig = config.autoTopUpEnabled
+  ? {
+      accountId: config.hederaAccountId!,
+      privateKey: config.hederaPrivateKey!,
+      memo: 'mcp-autotopup',
+    }
+  : undefined;
 
 const broker = new RegistryBrokerClient({
   baseUrl: config.registryBrokerUrl,
   apiKey: config.registryBrokerApiKey,
-  registrationAutoTopUp: config.autoTopUpEnabled
-    ? {
-        accountId: config.hederaAccountId!,
-        privateKey: config.hederaPrivateKey!,
-        memo: 'mcp-autotopup',
-      }
-    : undefined,
+  fetchImplementation: undiciFetch as unknown as typeof fetch,
+  registrationAutoTopUp: autoTopUpConfig,
+  historyAutoTopUp: autoTopUpConfig,
 });
 
 const brokerLimiter = createLimiter();
@@ -21,28 +26,25 @@ const brokerLimiter = createLimiter();
 function createLimiter() {
   if (!config.rateLimit) return undefined;
 
-  const limiterOptions: Bottleneck.ConstructorOptions = {};
-
-  if (config.rateLimit.maxConcurrent !== undefined) {
-    limiterOptions.maxConcurrent = config.rateLimit.maxConcurrent;
-  }
-  if (config.rateLimit.minTimeMs !== undefined) {
-    limiterOptions.minTime = config.rateLimit.minTimeMs;
-  }
-  if (config.rateLimit.reservoir !== undefined) {
-    limiterOptions.reservoir = config.rateLimit.reservoir;
-  }
-  if (config.rateLimit.reservoirRefreshAmount !== undefined) {
-    limiterOptions.reservoirRefreshAmount = config.rateLimit.reservoirRefreshAmount;
-  }
-  if (config.rateLimit.reservoirRefreshIntervalMs !== undefined) {
-    limiterOptions.reservoirRefreshInterval = config.rateLimit.reservoirRefreshIntervalMs;
-  }
-
-  if (config.rateLimit.redis?.url) {
-    limiterOptions.datastore = 'ioredis';
-    limiterOptions.connection = new IORedis(config.rateLimit.redis.url);
-  }
+  const redisClient = config.rateLimit.redis?.url ? new IORedis(config.rateLimit.redis.url) : undefined;
+  const limiterOptions: Bottleneck.ConstructorOptions = {
+    ...(config.rateLimit.maxConcurrent !== undefined
+      ? { maxConcurrent: config.rateLimit.maxConcurrent }
+      : {}),
+    ...(config.rateLimit.minTimeMs !== undefined
+      ? { minTime: config.rateLimit.minTimeMs }
+      : {}),
+    ...(config.rateLimit.reservoir !== undefined
+      ? { reservoir: config.rateLimit.reservoir }
+      : {}),
+    ...(config.rateLimit.reservoirRefreshAmount !== undefined
+      ? { reservoirRefreshAmount: config.rateLimit.reservoirRefreshAmount }
+      : {}),
+    ...(config.rateLimit.reservoirRefreshIntervalMs !== undefined
+      ? { reservoirRefreshInterval: config.rateLimit.reservoirRefreshIntervalMs }
+      : {}),
+    ...(redisClient ? { datastore: 'ioredis' as const, connection: redisClient as unknown as Bottleneck.IORedisConnection } : {}),
+  };
 
   if (
     !limiterOptions.maxConcurrent &&
@@ -110,9 +112,9 @@ export async function getCreditBalance(accountId?: string): Promise<CreditBalanc
   return request();
 }
 
-async function safeReadBody(response: Response) {
+async function safeReadBody(response: Response | UndiciResponse) {
   try {
-    const text = await response.text();
+    const text = await (response as any).text();
     return text || undefined;
   } catch {
     return undefined;

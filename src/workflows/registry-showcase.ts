@@ -4,6 +4,7 @@ import { withBroker } from '../broker';
 import { discoveryPipeline } from './discovery';
 import { chatPipeline } from './chat';
 import { opsPipeline } from './ops';
+import type { AgentRegistrationRequest } from '@hashgraphonline/standards-sdk';
 
 export interface RegistryShowcaseInput {
   query?: string;
@@ -110,7 +111,12 @@ const registryShowcaseDefinition: PipelineDefinition<RegistryShowcaseInput, Regi
       name: 'hol.getRegistrationQuote',
       skip: ({ input }) => !input.performCreditCheck,
       run: async ({ context }) => {
-        const response = await withBroker((client) => client.getRegistrationQuote(context.discovery?.context?.registrationPayload || context.discovery));
+        const discoveryRecord =
+          context.discovery && typeof context.discovery === 'object'
+            ? (context.discovery as { context?: Record<string, unknown> })
+            : null;
+        const payload = (discoveryRecord?.context as { registrationPayload?: unknown } | undefined)?.registrationPayload ?? context.discovery;
+        const response = await withBroker((client) => client.getRegistrationQuote(payload as unknown as AgentRegistrationRequest));
         context.creditQuote = response;
         return response;
       },

@@ -1,4 +1,4 @@
-import type { AgentRegistrationRequest } from '@hashgraphonline/standards-sdk';
+import type { AgentRegistrationRequest, RegisterAgentQuoteResponse } from '@hashgraphonline/standards-sdk';
 import { registerPipeline } from './registry';
 import type { PipelineDefinition } from './types';
 import { withBroker } from '../broker';
@@ -6,15 +6,15 @@ import type { CreditShortfallSummary } from './errors';
 import { runCreditAwareRegistration } from './utils/credits';
 
 interface RegistrationInput {
-  payload: Record<string, unknown>;
+  payload: AgentRegistrationRequest;
 }
 
 interface RegistrationContext {
-  payload: Record<string, unknown>;
+  payload: AgentRegistrationRequest;
   attemptId?: string;
   result?: unknown;
   uaid?: string;
-  quote?: CreditShortfallSummary;
+  quote?: CreditShortfallSummary | RegisterAgentQuoteResponse;
 }
 
 const registrationDefinition: PipelineDefinition<RegistrationInput, RegistrationContext> = {
@@ -37,8 +37,8 @@ const registrationDefinition: PipelineDefinition<RegistrationInput, Registration
       name: 'hol.registerAgent',
       run: async ({ context }) => {
         const response = await runCreditAwareRegistration({
-          payload: context.payload as AgentRegistrationRequest,
-          onShortfall: async (err) => {
+          payload: context.payload,
+          onShortfall: (err) => {
             context.quote = err.summary;
             return 'abort';
           },
@@ -62,8 +62,12 @@ const registrationDefinition: PipelineDefinition<RegistrationInput, Registration
             timeoutMs: 5 * 60_000,
           }),
         );
-        if (result?.result?.uaid) {
-          context.uaid = result.result.uaid;
+        if (result && typeof result === 'object' && 'result' in result) {
+          const progress = result as { result?: Record<string, unknown> };
+          const maybeUaid = progress.result?.uaid;
+          if (typeof maybeUaid === 'string') {
+            context.uaid = maybeUaid;
+          }
         }
         return result;
       },

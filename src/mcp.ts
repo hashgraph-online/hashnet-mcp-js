@@ -1,12 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import {
-  AgentAuthConfig,
-  LedgerChallengeRequest,
-  LedgerVerifyRequest,
-  PurchaseCreditsWithHbarParams,
-  RegistryBrokerClient,
-  RegistryBrokerError,
-} from '@hashgraphonline/standards-sdk';
+import { AgentAuthConfig, LedgerChallengeRequest, LedgerVerifyRequest, RegistryBrokerClient, RegistryBrokerError } from '@hashgraphonline/standards-sdk';
 import { FastMCP } from 'fastmcp';
 import type { Context, Content } from 'fastmcp';
 import { z } from 'zod';
@@ -33,13 +26,14 @@ type ChatSendMessagePayload = Parameters<RegistryBrokerClient['chat']['sendMessa
 type ChatCompactPayload = Parameters<RegistryBrokerClient['chat']['compactHistory']>[0];
 type UpdateAgentPayload = Parameters<RegistryBrokerClient['updateAgent']>[1];
 type RegistrySearchNamespaceArgs = Parameters<RegistryBrokerClient['registrySearchByNamespace']>;
-type PurchaseHbarPayload = PurchaseCreditsWithHbarParams;
+type PurchaseHbarPayload = Parameters<RegistryBrokerClient['purchaseCreditsWithHbar']>[0];
+type BuyX402Payload = Parameters<RegistryBrokerClient['buyCreditsWithX402']>[0];
 
 const connectionInstructions = [
   'You expose the Hashgraph Online Registry Broker via hol.* primitives and workflow.* pipelines. Prefer workflow.* when possible—they bundle common steps and return a pipeline summary plus full results.',
   'Discovery: use workflow.discovery (or hol.search / hol.vectorSearch) to find UAIDs/agents/MCP servers; pass q/query and optional filters like capabilities, metadata, or type=ai-agents|mcp-servers.',
   'Registration: workflow.registerMcp (quote → register → wait) is the default; workflow.fullRegistration adds discovery/chat/ops. hol.registerAgent + hol.waitForRegistrationCompletion are the lower-level primitives.',
-  'Chat: call hol.resolveUaid if the UAID is unverified, then hol.chat.createSession (uaid or agentUrl + optional auth) followed by hol.chat.sendMessage (sessionId or uaid/agentUrl). Use hol.chat.history/compact/end to manage the session.',
+  'Chat: call hol.resolveUaid if the UAID is unverified, then hol.chat.createSession (uaid + optional auth) followed by hol.chat.sendMessage (sessionId or uaid). Use hol.chat.history/compact/end to manage the session.',
   'Operations: workflow.opsCheck or hol.stats/hol.metricsSummary/hol.dashboardStats show registry health; hol.listProtocols + hol.detectProtocol help route third-party requests.',
   'Credits: check hol.credits.balance before purchases. Use hol.purchaseCredits.hbar or hol.x402.buyCredits only with explicit user approval (X402 requires an EVM key); hol.x402.minimums provides thresholds.',
   'Always include UAIDs/sessionIds exactly as given and echo any auth headers/tokens the user supplies. If required fields are missing (UAID, payload, accountId), ask for them before calling tools.',
@@ -58,31 +52,25 @@ const agentAuthSchema: z.ZodType<AgentAuthConfig> = z
   })
   .partial() as z.ZodType<AgentAuthConfig>;
 
-const chatSessionSchema: z.ZodType<ChatCreateSessionPayload> = z
-  .object({
-    uaid: z.string().min(1).optional(),
-    agentUrl: z.string().url().optional(),
-    historyTtlSeconds: z.number().int().positive().optional(),
-    auth: agentAuthSchema.optional(),
-  })
-  .superRefine((value, ctx) => {
-    if (!value.uaid && !value.agentUrl) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'uaid or agentUrl is required' });
-    }
-  }) as z.ZodType<ChatCreateSessionPayload>;
+const chatSessionSchema: z.ZodType<ChatCreateSessionPayload> = z.object({
+  uaid: z.string().min(1),
+  historyTtlSeconds: z.number().int().positive().optional(),
+  auth: agentAuthSchema.optional(),
+  senderUaid: z.string().min(1).optional(),
+  encryptionRequested: z.boolean().optional(),
+}) as z.ZodType<ChatCreateSessionPayload>;
 
 const chatMessageSchema: z.ZodType<ChatSendMessagePayload> = z
   .object({
     sessionId: z.string().min(1).optional(),
     uaid: z.string().min(1).optional(),
-    agentUrl: z.string().url().optional(),
     message: z.string().min(1),
     streaming: z.boolean().optional(),
     auth: agentAuthSchema.optional(),
   })
   .superRefine((value, ctx) => {
-    if (!value.sessionId && !value.uaid && !value.agentUrl) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Provide sessionId for existing chats or uaid/agentUrl to start a new one.' });
+    if (!value.sessionId && !value.uaid) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Provide sessionId for existing chats or uaid to start a new one.' });
     }
   }) as z.ZodType<ChatSendMessagePayload>;
 
@@ -138,6 +126,72 @@ const workflowFullInput = z.object({
   discoveryQuery: z.string().optional(),
   chatMessage: z.string().optional(),
 });
+const openRouterChatToolSchema = z.object({
+  modelId: z.string().min(1),
+  registry: z.string().optional(),
+  message: z.string(),
+  authToken: z.string().optional(),
+});
+const registryShowcaseToolSchema = z.object({
+  query: z.string().optional(),
+  uaid: z.string().optional(),
+  message: z.string().optional(),
+  performCreditCheck: z.boolean().optional(),
+});
+const erc8004DiscoveryToolSchema = z.object({ query: z.string().optional(), limit: z.number().int().positive().optional() });
+const bridgePayloadSchema = z.object({
+  uaid: z.string().min(1),
+  agentverseUaid: z.string().min(1),
+  localMessage: z.string().min(1),
+  agentverseMessage: z.string().min(1),
+  iterations: z.number().int().positive().optional(),
+});
+const erc8004X402ToolSchema = z.object({
+  payload: agentRegistrationSchema,
+  erc8004Networks: z.array(z.string()).optional(),
+  chatMessage: z.string().optional(),
+});
+const x402RegistrationToolSchema = z.object({
+  payload: agentRegistrationSchema,
+    x402: z.object({
+      accountId: z.string().min(1),
+      credits: z.number().positive(),
+      evmPrivateKey: z.string().min(1),
+      ledgerVerification: z
+        .object({
+          challengeId: z.string().min(1),
+          accountId: z.string().min(1),
+          network: z.enum(['mainnet', 'testnet']),
+          signature: z.string().min(1),
+          signatureKind: z.enum(['raw', 'map']).optional(),
+          publicKey: z.string().optional(),
+          expiresInMinutes: z.number().int().positive().optional(),
+        })
+        .optional(),
+    }),
+  chatMessage: z.string().optional(),
+});
+
+type SearchInput = z.infer<typeof searchInput>;
+type VectorSearchInput = z.infer<typeof vectorSearchInput>;
+type UaidInput = z.infer<typeof uaidInput>;
+type SessionAuth = Record<string, unknown> | undefined;
+type RegistrationInput = z.infer<typeof registrationPayload>;
+type WaitForRegistrationInput = z.infer<typeof waitForRegistrationInput>;
+type UpdateAgentInput = z.infer<typeof updateAgentInput>;
+type RegistryNamespaceInput = z.infer<typeof registryNamespaceInput>;
+type ChatSessionInput = z.infer<typeof chatSessionSchema>;
+type ChatMessageInput = z.infer<typeof chatMessageSchema>;
+type ChatCompactInput = z.infer<typeof chatCompactSchema>;
+type CreditBalanceInput = z.infer<typeof creditBalanceInput>;
+type LedgerChallengeInput = z.infer<typeof ledgerChallengeInput>;
+type LedgerVerifyInput = z.infer<typeof ledgerVerifyInput>;
+type PurchaseHbarInput = z.infer<typeof purchaseHbarInput>;
+type BuyX402Input = z.infer<typeof buyX402Input>;
+type BridgePayload = z.infer<typeof bridgePayloadSchema>;
+type Erc8004X402Input = z.infer<typeof erc8004X402ToolSchema>;
+type X402RegistrationInput = z.infer<typeof x402RegistrationToolSchema>;
+type FullWorkflowInput = z.infer<typeof workflowFullInput>;
 
 const waitForRegistrationInput = z.object({
   attemptId: z.string(),
@@ -194,7 +248,7 @@ const purchaseHbarInput: z.ZodType<PurchaseHbarPayload> = z.object({
   metadata: z.record(z.string(), z.any()).optional(),
 }) as z.ZodType<PurchaseHbarPayload>;
 
-const buyX402Input = z.object({
+const buyX402Input: z.ZodType<BuyX402Payload> = z.object({
   accountId: z.string().min(1),
   credits: z.number().positive(),
   usdAmount: z.number().positive().optional(),
@@ -203,12 +257,11 @@ const buyX402Input = z.object({
   evmPrivateKey: z.string().min(1),
   network: z.enum(['base', 'base-sepolia']).optional(),
   rpcUrl: z.string().url().optional(),
-});
+}) as z.ZodType<BuyX402Payload>;
 
 export const mcp = new FastMCP({
   name: 'hashgraph-standards',
   version: '1.0.0',
-  description: 'MCP tools exposing Hashgraph Online Registry Broker via standards-sdk',
   instructions: connectionInstructions,
   // Route FastMCP logging to our pino logger (stderr) to keep stdio transport clean.
   logger: {
@@ -227,24 +280,24 @@ type ToolDefinition<Schema extends z.ZodTypeAny = z.ZodTypeAny> = {
   handler: (input: z.infer<Schema>) => Promise<unknown>;
 };
 
-export const toolDefinitions: ToolDefinition[] = [
+const rawToolDefinitions = [
   {
     name: 'hol.search',
     description: 'Keyword search for agents or MCP servers with filtering controls.',
     schema: searchInput,
-    handler: (input) => withBroker((client) => client.search(input), 'hol.search'),
+    handler: (input: SearchInput) => withBroker((client) => client.search(input), 'hol.search'),
   },
   {
     name: 'hol.vectorSearch',
     description: 'Vector similarity search across registered agents.',
     schema: vectorSearchInput,
-    handler: (input) => withBroker((client) => client.vectorSearch(input), 'hol.vectorSearch'),
+    handler: (input: VectorSearchInput) => withBroker((client) => client.vectorSearch(input), 'hol.vectorSearch'),
   },
   {
     name: 'hol.resolveUaid',
     description: 'Resolve, validate, and check the status of a UAID in one call.',
     schema: uaidInput,
-    handler: ({ uaid }) =>
+    handler: ({ uaid }: UaidInput) =>
       withBroker(async (client) => {
         const [resolved, validation, status] = await Promise.all([
           client.resolveUaid(uaid),
@@ -258,25 +311,25 @@ export const toolDefinitions: ToolDefinition[] = [
     name: 'hol.closeUaidConnection',
     description: 'Force-close any open UAID connection.',
     schema: uaidInput,
-    handler: ({ uaid }) => withBroker((client) => client.closeUaidConnection(uaid), 'hol.closeUaidConnection'),
+    handler: ({ uaid }: UaidInput) => withBroker((client) => client.closeUaidConnection(uaid), 'hol.closeUaidConnection'),
   },
   {
     name: 'hol.getRegistrationQuote',
     description: 'Estimate fees for a given agent registration payload.',
     schema: registrationPayload,
-    handler: ({ payload }) => withBroker((client) => client.getRegistrationQuote(payload), 'hol.getRegistrationQuote'),
+    handler: ({ payload }: RegistrationInput) => withBroker((client) => client.getRegistrationQuote(payload), 'hol.getRegistrationQuote'),
   },
   {
     name: 'hol.registerAgent',
     description: 'Submit an HCS-11-compatible agent registration.',
     schema: registrationPayload,
-    handler: ({ payload }) => withBroker((client) => client.registerAgent(payload), 'hol.registerAgent'),
+    handler: ({ payload }: RegistrationInput) => withBroker((client) => client.registerAgent(payload), 'hol.registerAgent'),
   },
   {
     name: 'hol.waitForRegistrationCompletion',
     description: 'Poll the registry broker until a registration attempt resolves.',
     schema: waitForRegistrationInput,
-    handler: ({ attemptId, intervalMs, timeoutMs }) =>
+    handler: ({ attemptId, intervalMs, timeoutMs }: WaitForRegistrationInput) =>
       withBroker((client) =>
         client.waitForRegistrationCompletion(attemptId, {
           intervalMs,
@@ -289,7 +342,8 @@ export const toolDefinitions: ToolDefinition[] = [
     name: 'hol.updateAgent',
     description: 'Update an existing agent registration payload.',
     schema: updateAgentInput,
-    handler: ({ uaid, payload }) => withBroker((client) => client.updateAgent(uaid, payload as UpdateAgentPayload), 'hol.updateAgent'),
+    handler: ({ uaid, payload }: UpdateAgentInput) =>
+      withBroker((client) => client.updateAgent(uaid, payload as UpdateAgentPayload), 'hol.updateAgent'),
   },
   {
     name: 'hol.additionalRegistries',
@@ -301,67 +355,67 @@ export const toolDefinitions: ToolDefinition[] = [
     name: 'hol.registrySearchByNamespace',
     description: 'Search within a specific registry namespace.',
     schema: registryNamespaceInput,
-    handler: ({ registry, query }) =>
+    handler: ({ registry, query }: RegistryNamespaceInput) =>
       withBroker((client) => client.registrySearchByNamespace(registry, query), 'hol.registrySearchByNamespace'),
   },
   {
     name: 'hol.chat.createSession',
     description: 'Open a chat session linked to a UAID.',
     schema: chatSessionSchema,
-    handler: (input) => withBroker((client) => client.chat.createSession(input), 'hol.chat.createSession'),
+    handler: (input: ChatSessionInput) => withBroker((client) => client.chat.createSession(input), 'hol.chat.createSession'),
   },
   {
     name: 'hol.chat.sendMessage',
     description: 'Send a message to an active chat session.',
     schema: chatMessageSchema,
-    handler: (input) =>
+    handler: (input: ChatMessageInput) =>
       withBroker(async (client) => {
-        if (input.sessionId) {
-          return client.chat.sendMessage(input);
+        const { sessionId, uaid, message, auth, streaming } = input;
+        if (sessionId) {
+          const payload: ChatSendMessagePayload = { sessionId, message, auth, streaming };
+          return client.chat.sendMessage(payload);
         }
 
-        const uaid = (input as any).uaid;
-        const agentUrl = (input as any).agentUrl;
-        if (!uaid && !agentUrl) {
-          throw new Error('sessionId missing; provide uaid or agentUrl so a session can be created before sending.');
+        if (!uaid) {
+          throw new Error('sessionId missing; provide uaid so a session can be created before sending.');
         }
 
-        // Auto-create a session when callers only supply a UAID/agentUrl.
-        const session = await client.chat.createSession({
-          uaid,
-          agentUrl,
-          auth: input.auth,
-        } as any);
-        const sessionId = (session as any).sessionId ?? (session as any).id;
-        if (!sessionId) {
+        // Auto-create a session when callers only supply a UAID.
+        const session = await client.chat.createSession({ uaid, auth });
+        const derivedSessionId = session.sessionId;
+        if (!derivedSessionId) {
           throw new Error('Unable to determine sessionId from broker response when auto-creating chat session.');
         }
 
-        return client.chat.sendMessage({
-          sessionId,
-          message: input.message,
-          auth: input.auth,
-          streaming: input.streaming,
-        } as any);
+        const payload: ChatSendMessagePayload = {
+          sessionId: derivedSessionId,
+          message,
+          auth,
+          streaming,
+        };
+
+        return client.chat.sendMessage(payload);
       }, 'hol.chat.sendMessage'),
   },
   {
     name: 'hol.chat.history',
     description: 'Retrieve the message history for a chat session.',
     schema: sessionIdInput,
-    handler: ({ sessionId }) => withBroker((client) => client.chat.getHistory(sessionId), 'hol.chat.history'),
+    handler: ({ sessionId }: z.infer<typeof sessionIdInput>) =>
+      withBroker((client) => client.chat.getHistory(sessionId), 'hol.chat.history'),
   },
   {
     name: 'hol.chat.compact',
     description: 'Compact chat history while preserving the latest entries.',
     schema: chatCompactSchema,
-    handler: (input) => withBroker((client) => client.chat.compactHistory(input), 'hol.chat.compact'),
+    handler: (input: ChatCompactInput) => withBroker((client) => client.chat.compactHistory(input), 'hol.chat.compact'),
   },
   {
     name: 'hol.chat.end',
     description: 'End a chat session and release broker resources.',
     schema: sessionIdInput,
-    handler: ({ sessionId }) => withBroker((client) => client.chat.endSession(sessionId), 'hol.chat.end'),
+    handler: ({ sessionId }: z.infer<typeof sessionIdInput>) =>
+      withBroker((client) => client.chat.endSession(sessionId), 'hol.chat.end'),
   },
   {
     name: 'hol.listProtocols',
@@ -373,7 +427,7 @@ export const toolDefinitions: ToolDefinition[] = [
     name: 'hol.detectProtocol',
     description: 'Detect the expected protocol for an inbound request payload.',
     schema: detectProtocolInput,
-    handler: (input) =>
+    handler: (input: z.infer<typeof detectProtocolInput>) =>
       runBrokerCall('hol.detectProtocol', () => withBroker((client) => client.detectProtocol(input as any), 'hol.detectProtocol')),
   },
   {
@@ -404,25 +458,28 @@ export const toolDefinitions: ToolDefinition[] = [
     name: 'hol.ledger.challenge',
     description: 'Create a ledger challenge message for account verification.',
     schema: ledgerChallengeInput,
-    handler: (input) => withBroker((client) => client.createLedgerChallenge(input as LedgerChallengeRequest), 'hol.ledger.challenge'),
+    handler: (input: LedgerChallengeInput) =>
+      withBroker((client) => client.createLedgerChallenge(input as LedgerChallengeRequest), 'hol.ledger.challenge'),
   },
   {
     name: 'hol.ledger.authenticate',
     description: 'Verify a signed ledger challenge (sets ledger API key).',
     schema: ledgerVerifyInput,
-    handler: (input) => withBroker((client) => client.verifyLedgerChallenge(input as LedgerVerifyRequest), 'hol.ledger.authenticate'),
+    handler: (input: LedgerVerifyInput) =>
+      withBroker((client) => client.verifyLedgerChallenge(input as LedgerVerifyRequest), 'hol.ledger.authenticate'),
   },
   {
     name: 'hol.purchaseCredits.hbar',
     description: 'Purchase registry credits using HBAR funds.',
     schema: purchaseHbarInput,
-    handler: (input) => withBroker((client) => client.purchaseCreditsWithHbar(input), 'hol.purchaseCredits.hbar'),
+    handler: (input: PurchaseHbarInput) =>
+      withBroker((client) => client.purchaseCreditsWithHbar(input), 'hol.purchaseCredits.hbar'),
   },
   {
     name: 'hol.credits.balance',
     description: 'Fetch credit balances for the current API key and optional Hedera/X402 accounts.',
     schema: creditBalanceInput,
-    handler: async (input) => {
+    handler: async (input: CreditBalanceInput) => {
       const hederaAccountId = input.hederaAccountId;
       const [apiKeyBalance, hederaBalance, x402Balance] = await Promise.all([
         getCreditBalance(),
@@ -446,25 +503,28 @@ export const toolDefinitions: ToolDefinition[] = [
     name: 'hol.x402.buyCredits',
     description: 'Buy registry credits via X402 using an EVM private key.',
     schema: buyX402Input,
-    handler: (input) => withBroker((client) => client.buyCreditsWithX402(input), 'hol.x402.buyCredits'),
+    handler: (input: BuyX402Input) => withBroker((client) => client.buyCreditsWithX402(input), 'hol.x402.buyCredits'),
   },
   {
     name: 'workflow.discovery',
     description: 'Pipeline: hol.search + hol.vectorSearch',
     schema: workflowDiscoveryInput,
-    handler: async (input) => formatPipelineResult(await discoveryPipeline.run(input)),
+    handler: async (input: z.infer<typeof workflowDiscoveryInput>) =>
+      formatPipelineResult(await discoveryPipeline.run(input)),
   },
   {
     name: 'workflow.registerMcp',
     description: 'Pipeline: get quote, register agent, wait for completion',
     schema: workflowRegistrationInput,
-    handler: async ({ payload }) => formatPipelineResult(await registrationPipeline.run({ payload })),
+    handler: async ({ payload }: z.infer<typeof workflowRegistrationInput>) =>
+      formatPipelineResult(await registrationPipeline.run({ payload })),
   },
   {
     name: 'workflow.chatSmoke',
     description: 'Pipeline: chat session smoke test for UAID',
     schema: workflowChatInput,
-    handler: async (input) => formatPipelineResult(await chatPipeline.run(input)),
+    handler: async (input: z.infer<typeof workflowChatInput>) =>
+      formatPipelineResult(await chatPipeline.run(input)),
   },
   {
     name: 'workflow.opsCheck',
@@ -475,72 +535,68 @@ export const toolDefinitions: ToolDefinition[] = [
   {
     name: 'workflow.openrouterChat',
     description: 'Pipeline: discover OpenRouter model and run a chat message',
-    schema: z.object({ modelId: z.string().min(1), registry: z.string().optional(), message: z.string(), authToken: z.string().optional() }),
-    handler: async (input) => formatPipelineResult(await openRouterChatWorkflow.run(input)),
+    schema: openRouterChatToolSchema,
+    handler: async (input: z.infer<typeof openRouterChatToolSchema>) =>
+      formatPipelineResult(await openRouterChatWorkflow.run(input)),
   },
   {
     name: 'workflow.registryBrokerShowcase',
     description: 'Pipeline: discovery, analytics, UAID validation, chat',
-    schema: z.object({ query: z.string().optional(), uaid: z.string().optional(), message: z.string().optional(), performCreditCheck: z.boolean().optional() }),
-    handler: async (input) => formatPipelineResult(await registryBrokerShowcaseWorkflow.run(input)),
+    schema: registryShowcaseToolSchema,
+    handler: async (input: z.infer<typeof registryShowcaseToolSchema>) =>
+      formatPipelineResult(await registryBrokerShowcaseWorkflow.run(input)),
   },
   {
     name: 'workflow.agentverseBridge',
     description: 'Pipeline: relay chat between local UAID and Agentverse UAID',
-    schema: z.object({
-      uaid: z.string().min(1),
-      agentverseUaid: z.string().min(1),
-      localMessage: z.string().min(1),
-      agentverseMessage: z.string().min(1),
-      iterations: z.number().int().positive().optional(),
-    }),
-    handler: async (input) => formatPipelineResult(await agentverseBridgeWorkflow.run(input)),
+    schema: bridgePayloadSchema,
+    handler: async (input: BridgePayload) =>
+      formatPipelineResult(await agentverseBridgeWorkflow.run(input)),
   },
   {
     name: 'workflow.erc8004Discovery',
     description: 'Pipeline: search ERC-8004 registries',
-    schema: z.object({ query: z.string().optional(), limit: z.number().int().positive().optional() }),
-    handler: async (input) => formatPipelineResult(await erc8004DiscoveryWorkflow.run(input)),
+    schema: erc8004DiscoveryToolSchema,
+    handler: async (input: z.infer<typeof erc8004DiscoveryToolSchema>) =>
+      formatPipelineResult(await erc8004DiscoveryWorkflow.run(input)),
   },
   {
     name: 'workflow.erc8004X402',
     description: 'Pipeline: ERC-8004 registration funded via X402 credits',
-    schema: z.object({
-      payload: agentRegistrationSchema,
-      erc8004Networks: z.array(z.string()).optional(),
-      chatMessage: z.string().optional(),
-    }),
-    handler: async (input) => formatPipelineResult(await erc8004X402Workflow.run(input)),
+    schema: erc8004X402ToolSchema,
+    handler: async (input: Erc8004X402Input) => formatPipelineResult(await erc8004X402Workflow.run(input)),
   },
   {
     name: 'workflow.x402Registration',
     description: 'Pipeline: register agent using X402 payments + chat smoke test',
-    schema: z.object({
-      payload: agentRegistrationSchema,
-      chatMessage: z.string().optional(),
-    }),
-    handler: async (input) => formatPipelineResult(await x402RegistrationWorkflow.run(input)),
+    schema: x402RegistrationToolSchema,
+    handler: async (input: X402RegistrationInput) => formatPipelineResult(await x402RegistrationWorkflow.run(input)),
   },
   {
     name: 'workflow.fullRegistration',
     description: 'Pipeline: discovery → register → chat → ops',
     schema: workflowFullInput,
-    handler: async (input) => formatPipelineResult(await fullWorkflowPipeline.run(input)),
+    handler: async (input: FullWorkflowInput) => formatPipelineResult(await fullWorkflowPipeline.run(input)),
   },
 ];
 
+export const toolDefinitions: ToolDefinition[] = rawToolDefinitions as unknown as ToolDefinition[];
+
 function formatPipelineResult(result: PipelineRunResult<unknown>) {
+  const contextRecord =
+    result.context && typeof result.context === 'object' ? (result.context as Record<string, unknown>) : {};
+  const contextUaid = typeof contextRecord.uaid === 'string' ? (contextRecord.uaid as string) : undefined;
   const summaryLines = [
     `Workflow: ${result.pipeline}`,
     result.dryRun ? '(dry-run)' : undefined,
-    result.context?.uaid ? `UAID: ${result.context.uaid}` : undefined,
+    contextUaid ? `UAID: ${contextUaid}` : undefined,
     `Steps executed: ${result.steps.length}`,
   ].filter(Boolean) as string[];
 
   return {
     content: [
       { type: 'text', text: summaryLines.join('\n') },
-      buildObjectContent('pipeline.result', result),
+      buildObjectContent('pipeline.result', result as unknown as Record<string, unknown>),
     ],
   };
 }
@@ -550,7 +606,7 @@ export function buildLoggedTool<S extends z.ZodTypeAny>(definition: ToolDefiniti
     name: definition.name,
     description: definition.description,
     parameters: definition.schema,
-    execute: async (args: z.input<S>, context?: Context) => {
+    execute: async (args: z.input<S>, context?: Context<SessionAuth>) => {
       const requestId = context?.requestId ?? randomUUID();
       const started = Date.now();
       try {
@@ -700,7 +756,7 @@ mcp.addResource({
         'Prefer workflow.* pipelines when available—they run multiple broker calls and return both a text summary and structured results:',
         '- Discovery: workflow.discovery { query?, limit? } (or hol.search / hol.vectorSearch).',
         '- Registration: workflow.registerMcp { payload } (quote → register → wait) or workflow.fullRegistration to add discovery/chat/ops.',
-        '- Chat: hol.chat.createSession { uaid or agentUrl, auth?, historyTtlSeconds? } → hol.chat.sendMessage { sessionId OR (uaid/agentUrl), message, auth?, streaming? } → hol.chat.history/compact/end.',
+        '- Chat: hol.chat.createSession { uaid, auth?, historyTtlSeconds? } → hol.chat.sendMessage { sessionId OR uaid, message, auth?, streaming? } → hol.chat.history/compact/end.',
         '- UAID validation/resets: hol.resolveUaid { uaid }, hol.closeUaidConnection { uaid }.',
         '- Ops/metrics: workflow.opsCheck or hol.stats / hol.metricsSummary / hol.dashboardStats.',
         '- Credits: hol.credits.balance first, then hol.purchaseCredits.hbar or hol.x402.buyCredits (X402 requires evmPrivateKey; call hol.x402.minimums to inspect limits).',

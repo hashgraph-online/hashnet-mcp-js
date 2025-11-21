@@ -34,8 +34,11 @@ const ledgerAuthDefinition: PipelineDefinition<LedgerAuthInput, LedgerAuthContex
       name: 'hol.ledger.authenticate',
       skip: ({ input }) => !input.signature,
       run: async ({ input, context }) => {
+        if (!context.challenge?.challengeId) {
+          throw new Error('Missing ledger challengeId');
+        }
         const verification = await withBrokerVerify({
-          challengeId: context.challenge?.challengeId ?? input['challengeId'] ?? '',
+          challengeId: context.challenge.challengeId,
           accountId: input.accountId,
           network: input.network,
           signature: input.signature!,

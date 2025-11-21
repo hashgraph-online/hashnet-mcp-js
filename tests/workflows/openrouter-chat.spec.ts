@@ -33,8 +33,16 @@ describe('openRouterChatWorkflow', () => {
   it('searches model, creates session, sends message, and ends chat', async () => {
     const result = await openRouterChatWorkflow.run({ modelId: 'anthropic/claude', message: 'hello' });
     expect(client.search).toHaveBeenCalled();
-    expect(client.chat.createSession).toHaveBeenCalled();
-    expect(client.chat.sendMessage).toHaveBeenCalledWith({ sessionId: 'session-1', auth: undefined, message: 'hello' });
+    expect(client.chat.createSession).toHaveBeenCalledWith({
+      uaid: 'uaid:openrouter',
+      historyTtlSeconds: 900,
+      auth: undefined,
+    });
+    expect(client.chat.sendMessage).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      auth: undefined,
+      message: 'hello',
+    });
     expect(client.chat.endSession).toHaveBeenCalledWith('session-1');
     expect(result.context.uaid).toBe('uaid:openrouter');
   });

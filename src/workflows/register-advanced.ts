@@ -31,6 +31,7 @@ interface RegisterAgentAdvancedContext {
   registrationResult?: unknown;
   updateResult?: unknown;
   progress?: unknown;
+  catalog?: AdditionalRegistryCatalogResponse;
 }
 
 const registerAgentAdvancedDefinition: PipelineDefinition<RegisterAgentAdvancedInput, RegisterAgentAdvancedContext> = {
@@ -44,14 +45,18 @@ const registerAgentAdvancedDefinition: PipelineDefinition<RegisterAgentAdvancedI
       name: 'hol.getAdditionalRegistries',
       allowDuringDryRun: true,
       skip: ({ input }) => !input.additionalRegistrySelections?.length && !input.updateAdditionalRegistries?.length,
-      run: async () => withBroker((client) => client.getAdditionalRegistries()),
+      run: async ({ context }) => {
+        const catalog = await withBroker((client) => client.getAdditionalRegistries());
+        context.catalog = catalog;
+        return catalog;
+      },
     },
     {
       name: 'workflow.resolveAdditionalRegistries',
       allowDuringDryRun: true,
-      run: async ({ input, context }, resultFromCatalog) => {
-        if (!resultFromCatalog) return null;
-        const catalog = resultFromCatalog as AdditionalRegistryCatalogResponse;
+      run: async ({ input, context }) => {
+        const catalog = context.catalog;
+        if (!catalog) return null;
         const selections = input.additionalRegistrySelections ?? [];
         const { resolved, missing } = resolveAdditionalSelections(selections, catalog);
         context.resolvedRegistries = resolved;
@@ -75,12 +80,12 @@ const registerAgentAdvancedDefinition: PipelineDefinition<RegisterAgentAdvancedI
       run: async ({ input, context }) => {
         const response = await runCreditAwareRegistration({
           payload: context.payload,
-          onShortfall: async (summary) => {
-            context.lastQuote = summary;
+          onShortfall: async (err) => {
+            context.lastQuote = err.summary;
             if (!input.creditTopUp) {
               return 'abort';
             }
-            await purchaseCreditsWithHbar(input.creditTopUp, summary);
+            await purchaseCreditsWithHbar(input.creditTopUp, err.summary);
             return 'retry';
           },
         });
@@ -100,8 +105,12 @@ const registerAgentAdvancedDefinition: PipelineDefinition<RegisterAgentAdvancedI
         if (!context.attemptId) throw new Error('Registration attemptId missing.');
         const result = await waitForRegistrationCompletion(context.attemptId);
         context.progress = result;
-        if (result?.result?.uaid) {
-          context.uaid = result.result.uaid;
+        if (result && typeof result === 'object' && 'result' in result) {
+          const progress = result as { result?: Record<string, unknown> };
+          const maybeUaid = progress.result?.uaid;
+          if (typeof maybeUaid === 'string') {
+            context.uaid = maybeUaid;
+          }
         }
         return result;
       },
@@ -127,6 +136,9 @@ const registerAgentAdvancedDefinition: PipelineDefinition<RegisterAgentAdvancedI
 export const registerAgentAdvancedPipeline = scaffoldWorkflow(registerAgentAdvancedDefinition);
 
 function resolveAdditionalSelections(selections: string[], catalog: AdditionalRegistryCatalogResponse) {
+  if (!catalog.registries || catalog.registries.length === 0) {
+    return { resolved: [], missing: selections };
+  }
   const resolved = new Set<string>();
   const missing: string[] = [];
   for (const selection of selections) {
@@ -144,13 +156,20 @@ function collectMatches(selection: string, catalog: AdditionalRegistryCatalogRes
   const target = selection.trim().toLowerCase();
   if (!target) return [];
   const matches: string[] = [];
-  for (const registry of catalog.registries) {
-    const registryId = registry.id.toLowerCase();
+  for (const registry of catalog.registries ?? []) {
+    const registryId = registry.id?.toLowerCase();
+    const networks = registry.networks ?? [];
+    if (!registryId || networks.length === 0) continue;
     if (registryId === target) {
-      registry.networks.forEach((network) => matches.push(network.key));
+      networks.forEach((network) => {
+        if (network?.key) {
+          matches.push(network.key);
+        }
+      });
       continue;
     }
-    for (const network of registry.networks) {
+    for (const network of networks) {
+      if (!network?.key) continue;
       const keyLower = network.key.toLowerCase();
       const networkIdLower = network.networkId?.toLowerCase();
       const labelLower = network.label?.toLowerCase();

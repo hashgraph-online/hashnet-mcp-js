@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const createdClients: Array<{ instance: ReturnType<typeof createClient>; options: Record<string, unknown> }> = [];
 const redisCtor = vi.fn((url: string) => ({ url }));
 const bottleneckInstances: any[] = [];
+const mockedFetch = vi.fn();
 
 function createClient() {
   return {
@@ -22,6 +23,10 @@ vi.mock('ioredis', () => ({
   default: redisCtor,
 }));
 
+vi.mock('undici', () => ({
+  fetch: mockedFetch,
+}));
+
 vi.mock('bottleneck', () => ({
   default: vi.fn(function MockBottleneck(this: any, options: Record<string, unknown>) {
     this.options = options;
@@ -32,7 +37,7 @@ vi.mock('bottleneck', () => ({
 
 const baseConfig = {
   registryBrokerUrl: 'https://registry.test',
-  registryBrokerApiKey: undefined,
+  registryBrokerApiKey: 'test-api-key',
   hederaAccountId: undefined,
   hederaPrivateKey: undefined,
   port: 3333,
@@ -55,6 +60,7 @@ describe('broker helpers', () => {
     createdClients.length = 0;
     redisCtor.mockClear();
     bottleneckInstances.length = 0;
+    mockedFetch.mockClear();
   });
 
   it('executes tasks immediately when no limiter is configured', async () => {
@@ -82,6 +88,17 @@ describe('broker helpers', () => {
       privateKey: 'private-key',
       memo: 'mcp-autotopup',
     });
+    expect(createdClients[0]?.options.historyAutoTopUp).toEqual({
+      accountId: '0.0.123',
+      privateKey: 'private-key',
+      memo: 'mcp-autotopup',
+    });
+  });
+
+  it('uses undici fetch implementation explicitly', async () => {
+    mockConfig();
+    await import('../../src/broker');
+    expect(createdClients[0]?.options.fetchImplementation).toBe(mockedFetch);
   });
 
   it('schedules calls through bottleneck when configured', async () => {

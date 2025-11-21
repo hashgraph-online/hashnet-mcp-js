@@ -1,5 +1,7 @@
 import { z } from 'zod';
-import type { AgentRegistrationRequest } from '@hashgraphonline/standards-sdk/dist/es/services/registry-broker/types.js';
+import type { RegistryBrokerClient } from '@hashgraphonline/standards-sdk';
+
+type AgentRegistrationRequest = Parameters<RegistryBrokerClient['registerAgent']>[0];
 
 const socialLinkSchema = z.object({
   platform: z.string(),
@@ -75,7 +77,7 @@ const metadataSchema = z.object({
   customFields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
 });
 
-export const agentRegistrationSchema: z.ZodType<AgentRegistrationRequest> = z.object({
+export const agentRegistrationSchema = z.object({
   profile: agentProfileSchema,
   endpoint: z.string().url().optional(),
   protocol: z.string().optional(),
@@ -83,4 +85,4 @@ export const agentRegistrationSchema: z.ZodType<AgentRegistrationRequest> = z.ob
   registry: z.string().optional(),
   additionalRegistries: z.array(z.string()).optional(),
   metadata: metadataSchema.optional(),
-});
+}) as unknown as z.ZodType<AgentRegistrationRequest>;

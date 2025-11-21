@@ -62,7 +62,15 @@ const chatDefinition: PipelineDefinition<ChatInput, ChatContext> = {
       allowDuringDryRun: true,
       run: async ({ context }) => {
         if (!context.sessionId) throw new Error('Missing chat session');
-        return withBroker((client) => client.chat.compactHistory({ sessionId: context.sessionId!, preserveEntries: 2 }));
+        try {
+          return await withBroker((client) => client.chat.compactHistory({ sessionId: context.sessionId!, preserveEntries: 2 }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message.toLowerCase() : '';
+          if (message.includes('authenticated account required') || message.includes('insufficient credits')) {
+            return { skipped: true, reason: 'history compaction requires authenticated account' };
+          }
+          throw error;
+        }
       },
     },
     {

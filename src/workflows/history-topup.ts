@@ -71,10 +71,11 @@ const historyTopUpDefinition: PipelineDefinition<HistoryTopUpInput, HistoryTopUp
       name: 'workflow.historyTopUp.compact',
       run: async ({ input, context }) => {
         if (!context.sessionId) throw new Error('Missing chat session');
+        const sessionId = context.sessionId;
         const preserveEntries = input.preserveEntries ?? 2;
         try {
           const response = await withBroker((client) =>
-            client.chat.compactHistory({ sessionId: context.sessionId!, preserveEntries }),
+            client.chat.compactHistory({ sessionId, preserveEntries }),
           );
           context.compactions.push(response);
           return response;
@@ -86,12 +87,12 @@ const historyTopUpDefinition: PipelineDefinition<HistoryTopUpInput, HistoryTopUp
                 privateKey: input.creditTopUp.privateKey,
                 hbarAmount: input.creditTopUp.hbarAmount ?? 0.25,
                 memo: input.creditTopUp.memo ?? 'workflow.historyTopUp',
-                metadata: { sessionId: context.sessionId },
+                metadata: { sessionId },
               }),
             );
             context.purchases.push(purchase);
             const retry = await withBroker((client) =>
-              client.chat.compactHistory({ sessionId: context.sessionId!, preserveEntries }),
+              client.chat.compactHistory({ sessionId, preserveEntries }),
             );
             context.compactions.push(retry);
             return retry;

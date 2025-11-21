@@ -42,7 +42,11 @@ const openRouterChatDefinition: PipelineDefinition<OpenRouterChatInput, OpenRout
         if (!context.uaid) throw new Error('UAID missing from discovery step');
         const auth = input.authToken ? { type: 'bearer' as const, token: input.authToken } : undefined;
         const response = await withBroker((client) =>
-          client.chat.createSession({ uaid: context.uaid!, historyTtlSeconds: input.historyTtlSeconds ?? 900, auth }),
+          client.chat.createSession({
+            uaid: context.uaid!,
+            historyTtlSeconds: input.historyTtlSeconds ?? 900,
+            auth,
+          }),
         );
         context.sessionId = response.sessionId;
         return response;

@@ -5,6 +5,7 @@ process.env.REGISTRY_BROKER_API_KEY = process.env.REGISTRY_BROKER_API_KEY ?? 'te
 const client = {
   search: vi.fn().mockResolvedValue({ hits: [{ uaid: 'uaid:demo' }] }),
   vectorSearch: vi.fn().mockResolvedValue([]),
+  resolveUaid: vi.fn().mockResolvedValue({ agent: { endpoints: ['https://agent.example.com'] } }),
   listProtocols: vi.fn().mockResolvedValue(['proto']),
   detectProtocol: vi.fn().mockResolvedValue({ protocol: 'mcp' }),
   stats: vi.fn().mockResolvedValue({ total: 1 }),

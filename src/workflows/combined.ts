@@ -4,9 +4,10 @@ import { discoveryPipeline } from './discovery';
 import { registrationPipeline } from './registration';
 import { chatPipeline } from './chat';
 import { opsPipeline } from './ops';
+import type { AgentRegistrationRequest } from '@hashgraphonline/standards-sdk';
 
 interface FullWorkflowInput {
-  registrationPayload: Record<string, unknown>;
+  registrationPayload: AgentRegistrationRequest;
   discoveryQuery?: string;
   chatMessage?: string;
 }

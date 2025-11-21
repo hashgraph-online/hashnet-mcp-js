@@ -1,4 +1,4 @@
-import type { BuyCreditsWithX402Params, LedgerVerifyRequest } from '@hashgraphonline/standards-sdk';
+import type { LedgerVerifyRequest, RegistryBrokerClient, JsonObject } from '@hashgraphonline/standards-sdk';
 import { scaffoldWorkflow } from './scaffold';
 import type { PipelineDefinition } from './types';
 import { withBroker } from '../broker';
@@ -8,7 +8,7 @@ export interface X402TopUpInput {
   credits: number;
   usdAmount?: number;
   description?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: JsonObject;
   evmPrivateKey: string;
   network?: 'base' | 'base-sepolia';
   rpcUrl?: string;
@@ -20,6 +20,8 @@ interface X402TopUpContext {
   ledgerVerification?: unknown;
   purchase?: unknown;
 }
+
+type BuyCreditsWithX402Params = Parameters<RegistryBrokerClient['buyCreditsWithX402']>[0];
 
 const x402TopUpDefinition: PipelineDefinition<X402TopUpInput, X402TopUpContext> = {
   name: 'workflow.x402TopUp',
@@ -58,7 +60,7 @@ const x402TopUpDefinition: PipelineDefinition<X402TopUpInput, X402TopUpContext> 
           evmPrivateKey: input.evmPrivateKey,
           network: input.network,
           rpcUrl: input.rpcUrl,
-        } as BuyCreditsWithX402Params;
+        };
         const purchase = await withBroker((client) => client.buyCreditsWithX402(payload));
         context.purchase = purchase;
         return purchase;

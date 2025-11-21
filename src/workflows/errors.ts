@@ -21,7 +21,7 @@ export class InsufficientCreditsError extends Error {
     super(message);
     this.name = 'InsufficientCreditsError';
     this.summary = {
-      requiredCredits: quote.requiredCredits,
+      requiredCredits: quote.requiredCredits ?? 0,
       availableCredits: quote.availableCredits ?? 0,
       shortfallCredits: shortfall,
       estimatedHbar: quote.estimatedHbar,

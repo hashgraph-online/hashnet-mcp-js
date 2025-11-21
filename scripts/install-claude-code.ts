@@ -52,16 +52,23 @@ async function main() {
     process.exit(1);
   }
 
-  const serverConfig: ClaudeServerConfig = {
-    transport: {
-      type: 'http',
-      url: options.endpoint,
-    },
+  const brokerUrl = process.env.REGISTRY_BROKER_API_URL ?? 'https://registry.hashgraphonline.com/api/v1';
+  const brokerKey = process.env.REGISTRY_BROKER_API_KEY;
+
+  const env: Record<string, string> = {
+    REGISTRY_BROKER_API_URL: brokerUrl,
   };
 
-  if (options.description) {
-    serverConfig.metadata = { description: options.description };
+  if (brokerKey) {
+    env.REGISTRY_BROKER_API_KEY = brokerKey;
   }
+
+  const serverConfig: ClaudeServerConfig = {
+    command: 'npx',
+    args: ['@hol-org/hashnet-mcp@1.0.19', 'up', '--transport', 'sse'],
+    env,
+    metadata: options.description ? { description: options.description } : undefined,
+  };
 
   config.mcpServers[options.name] = serverConfig;
 

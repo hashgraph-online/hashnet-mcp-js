@@ -43,6 +43,7 @@ const chatDefinition: PipelineDefinition<ChatInput, ChatContext> = {
           client.chat.sendMessage({
             sessionId: context.sessionId!,
             message: input.message ?? 'Hello from workflow.chatSmoke',
+            uaid: context.uaid,
             auth: input.auth ?? context.auth,
           }),
         );

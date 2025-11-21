@@ -12,7 +12,7 @@ const envSchema = z
     REGISTRY_BROKER_API_URL: z
       .string()
       .url()
-      .default('https://registry.hashgraphonline.com/api/v1'),
+      .default('https://hol.org/registry/api/v1'),
     REGISTRY_BROKER_API_KEY: z.string().min(1).optional(),
     HEDERA_ACCOUNT_ID: z.string().min(1).optional(),
     HEDERA_PRIVATE_KEY: z.string().min(1).optional(),

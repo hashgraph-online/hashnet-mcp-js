@@ -72,6 +72,7 @@ describe('broker helpers', () => {
     });
     expect(result).toBe('done');
     expect(createdClients).toHaveLength(1);
+    expect(createdClients[0]?.options.baseUrl).toBe('https://registry.test/api/v1');
     expect(createdClients[0].instance.search).toHaveBeenCalledWith('ping');
   });
 
@@ -141,5 +142,11 @@ describe('broker helpers', () => {
       reservoirRefreshAmount: 5,
       reservoirRefreshInterval: 500,
     });
+  });
+
+  it('normalizes registry hostnames to the hol registry base', async () => {
+    mockConfig({ registryBrokerUrl: 'https://registry.hashgraphonline.com/api/v1' });
+    await import('../../src/broker');
+    expect(createdClients[0]?.options.baseUrl).toBe('https://hol.org/registry/api/v1');
   });
 });

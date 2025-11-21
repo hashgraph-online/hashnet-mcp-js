@@ -16,6 +16,8 @@ interface BridgeInput {
 interface BridgeContext {
   localSession?: string;
   agentverseSession?: string;
+  localUaid?: string;
+  agentverseUaid?: string;
   transcripts: Array<{ target: 'local' | 'agentverse'; response: unknown }>;
 }
 
@@ -37,6 +39,8 @@ const agentverseBridgeDefinition: PipelineDefinition<BridgeInput, BridgeContext>
         );
         context.localSession = local.sessionId;
         context.agentverseSession = agentverse.sessionId;
+        context.localUaid = input.uaid;
+        context.agentverseUaid = input.agentverseUaid;
         return { local, agentverse };
       },
     },
@@ -49,11 +53,21 @@ const agentverseBridgeDefinition: PipelineDefinition<BridgeInput, BridgeContext>
         const iterations = input.iterations ?? 1;
         for (let i = 0; i < iterations; i += 1) {
           const localResponse = await withBroker((client) =>
-            client.chat.sendMessage({ sessionId: context.localSession!, auth: input.localAuth, message: input.localMessage }),
+            client.chat.sendMessage({
+              sessionId: context.localSession!,
+              auth: input.localAuth,
+              message: input.localMessage,
+              uaid: context.localUaid,
+            }),
           );
           context.transcripts.push({ target: 'local', response: localResponse });
           const agentverseResponse = await withBroker((client) =>
-            client.chat.sendMessage({ sessionId: context.agentverseSession!, auth: input.agentverseAuth, message: input.agentverseMessage }),
+            client.chat.sendMessage({
+              sessionId: context.agentverseSession!,
+              auth: input.agentverseAuth,
+              message: input.agentverseMessage,
+              uaid: context.agentverseUaid,
+            }),
           );
           context.transcripts.push({ target: 'agentverse', response: agentverseResponse });
         }

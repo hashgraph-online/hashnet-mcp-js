@@ -58,7 +58,7 @@ const openRouterChatDefinition: PipelineDefinition<OpenRouterChatInput, OpenRout
         if (!context.sessionId) throw new Error('Missing chat session');
         const auth = input.authToken ? { type: 'bearer' as const, token: input.authToken } : undefined;
         return withBroker((client) =>
-          client.chat.sendMessage({ sessionId: context.sessionId!, auth, message: input.message }),
+          client.chat.sendMessage({ sessionId: context.sessionId!, auth, message: input.message, uaid: context.uaid }),
         );
       },
     },

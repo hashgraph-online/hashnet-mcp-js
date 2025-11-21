@@ -42,6 +42,7 @@ describe('openRouterChatWorkflow', () => {
       sessionId: 'session-1',
       auth: undefined,
       message: 'hello',
+      uaid: 'uaid:openrouter',
     });
     expect(client.chat.endSession).toHaveBeenCalledWith('session-1');
     expect(result.context.uaid).toBe('uaid:openrouter');

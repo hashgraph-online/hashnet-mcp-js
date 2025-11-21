@@ -52,7 +52,7 @@ const historyTopUpDefinition: PipelineDefinition<HistoryTopUpInput, HistoryTopUp
         const last = messages[messages.length - 1];
         for (const message of messages) {
           await withBroker((client) =>
-            client.chat.sendMessage({ sessionId: context.sessionId!, auth: input.auth, message }),
+            client.chat.sendMessage({ sessionId: context.sessionId!, auth: input.auth, message, uaid: input.uaid }),
           );
         }
         return { lastMessage: last };

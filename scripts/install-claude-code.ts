@@ -52,7 +52,7 @@ async function main() {
     process.exit(1);
   }
 
-  const brokerUrl = process.env.REGISTRY_BROKER_API_URL ?? 'https://registry.hashgraphonline.com/api/v1';
+  const brokerUrl = process.env.REGISTRY_BROKER_API_URL ?? 'https://hol.org/registry/api/v1';
   const brokerKey = process.env.REGISTRY_BROKER_API_KEY;
 
   const env: Record<string, string> = {

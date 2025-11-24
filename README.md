@@ -105,6 +105,14 @@ Categories are exposed as MCP tools (`hol.*`) plus workflows (`workflow.*`):
 - **Chat**: Start with `hol.chat.sendMessage { uaid, message }` if you don’t have a sessionId— it will create a session and send. Otherwise use `hol.chat.createSession` then `hol.chat.sendMessage { sessionId, message }`. Manage with `hol.chat.history/compact/end`.
 - **Ops/Health**: `workflow.opsCheck` or the `hol.stats`/`hol.metricsSummary`/`hol.dashboardStats` trio.
 - **Credits**: Always check `hol.credits.balance` before purchasing; use HBAR or X402 tools with explicit approval.
+- **Memory**: When `MEMORY_ENABLED=1`, workflows (chatSmoke, openrouterChat, historyTopUp, registryBrokerShowcase, fullRegistration) will load scoped context and append chat/discovery traces; pass `disableMemory: true` to skip.
+
+## Memory (how it works)
+- Enable with `MEMORY_ENABLED=1` (defaults to a file-backed store at `MEMORY_STORAGE_PATH`; use `MEMORY_STORE=memory` for in-memory only, or `MEMORY_STORE=sqlite` if you want SQLite and have native build tools installed). Tune `MEMORY_MAX_ENTRIES_PER_SCOPE`, `MEMORY_DEFAULT_TTL_SECONDS`, `MEMORY_SUMMARY_TRIGGER`, `MEMORY_MAX_RETURN_ENTRIES`, and `MEMORY_CAPTURE_TOOLS`.
+- MCP tools: `hol.memory.context`, `hol.memory.note`, `hol.memory.search`, `hol.memory.clear` (see `help://hol/memory`). Scopes use `uaid`, `sessionId`, `namespace`, or `userId`.
+- Automatic capture: `hol.chat.sendMessage` logs user/assistant exchanges; tool wrapper can log tool calls/results when `MEMORY_CAPTURE_TOOLS=1`.
+- Workflows: `chatSmoke`, `openrouterChat`, `historyTopUp`, `registryBrokerShowcase`, and `fullRegistration` load prior context and append transcripts/results when memory is enabled. Add `disableMemory: true` in workflow inputs to opt out.
+- Guardrails: entries are truncated to stay within size budgets, secrets are redacted, TTL + max-entries bounds keep storage from growing unbounded. Summaries are generated heuristically once thresholds are exceeded.
 
 ## Tool catalog (what each does)
 **Discovery**
@@ -127,7 +135,6 @@ Categories are exposed as MCP tools (`hol.*`) plus workflows (`workflow.*`):
 - `hol.chat.history` / `hol.chat.compact` / `hol.chat.end` — manage chat lifecycle.
 
 **Protocols / Ops**
-- `hol.listProtocols`, `hol.detectProtocol` — inspect/route inbound payloads.
 - `hol.stats`, `hol.metricsSummary`, `hol.dashboardStats`, `hol.websocketStats` — broker health/metrics.
 
 **Credits**
@@ -150,6 +157,7 @@ Set in `.env` or your process:
 - `REGISTRY_BROKER_API_URL` (default `https://registry.hashgraphonline.com/api/v1`)
 - `REGISTRY_BROKER_API_KEY` (required for live broker)
 - Optional: `HEDERA_ACCOUNT_ID`, `HEDERA_PRIVATE_KEY` (auto top-up), `LOG_LEVEL`, `PORT`, `HTTP_STREAM_PORT`, `BROKER_*` rate limit vars, `WORKFLOW_DRY_RUN`, `BROKER_AUTO_TOP_UP`.
+- Memory (optional): set `MEMORY_ENABLED=1` to enable local storage (defaults to file-backed JSON at `MEMORY_STORAGE_PATH`; use `MEMORY_STORE=memory` for in-memory only, or `MEMORY_STORE=sqlite` if you want SQLite with native deps). Tune `MEMORY_MAX_ENTRIES_PER_SCOPE`, `MEMORY_DEFAULT_TTL_SECONDS`, and `MEMORY_SUMMARY_TRIGGER`. See `help://hol/memory` for the `hol.memory.*` tools.
 
 ## Testing & quality
 - Run once with coverage: `pnpm test --run --coverage`
@@ -163,4 +171,3 @@ Set in `.env` or your process:
 ## Logging & observability
 - `pino` structured logs; set `LOG_LEVEL=fatal|error|warn|info|debug|trace`.
 - Each tool call logs requestId + duration. SSE/HTTP transport logs requests. Credits/registration calls surface broker status/body on failure.
-

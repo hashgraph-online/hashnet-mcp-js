@@ -100,6 +100,9 @@
     "undici": "^7.16.0",
     "zod": "^4.1.12"
   },
+  "optionalDependencies": {
+    "better-sqlite3": "^11.5.0"
+  },
   "overrides": {
     "@hashgraphonline/standards-sdk": "^0.1.137"
   }

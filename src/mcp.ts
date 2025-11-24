@@ -19,6 +19,8 @@ import { erc8004DiscoveryWorkflow } from './workflows/erc8004-discovery';
 import { erc8004X402Workflow } from './workflows/erc8004-x402';
 import { x402RegistrationWorkflow } from './workflows/x402-registration';
 import type { PipelineRunResult } from './workflows/types';
+import { memoryService } from './memory';
+import type { MemoryScope } from './memory';
 
 type AgentRegistrationRequest = Parameters<RegistryBrokerClient['registerAgent']>[0];
 type ChatCreateSessionPayload = Parameters<RegistryBrokerClient['chat']['createSession']>[0];
@@ -117,6 +119,7 @@ const workflowRegistrationInput = z.object({
 const workflowChatInput = z.object({
   uaid: z.string().min(1),
   message: z.string().optional(),
+  disableMemory: z.boolean().optional(),
 });
 
 const workflowOpsInput = z.object({});
@@ -125,18 +128,21 @@ const workflowFullInput = z.object({
   registrationPayload: agentRegistrationSchema,
   discoveryQuery: z.string().optional(),
   chatMessage: z.string().optional(),
+  disableMemory: z.boolean().optional(),
 });
 const openRouterChatToolSchema = z.object({
   modelId: z.string().min(1),
   registry: z.string().optional(),
   message: z.string(),
   authToken: z.string().optional(),
+  disableMemory: z.boolean().optional(),
 });
 const registryShowcaseToolSchema = z.object({
   query: z.string().optional(),
   uaid: z.string().optional(),
   message: z.string().optional(),
   performCreditCheck: z.boolean().optional(),
+  disableMemory: z.boolean().optional(),
 });
 const erc8004DiscoveryToolSchema = z.object({ query: z.string().optional(), limit: z.number().int().positive().optional() });
 const bridgePayloadSchema = z.object({
@@ -192,6 +198,37 @@ type BridgePayload = z.infer<typeof bridgePayloadSchema>;
 type Erc8004X402Input = z.infer<typeof erc8004X402ToolSchema>;
 type X402RegistrationInput = z.infer<typeof x402RegistrationToolSchema>;
 type FullWorkflowInput = z.infer<typeof workflowFullInput>;
+const memoryScopeSchema = z
+  .object({
+    uaid: z.string().min(1).optional(),
+    sessionId: z.string().min(1).optional(),
+    namespace: z.string().min(1).optional(),
+    userId: z.string().min(1).optional(),
+  })
+  .refine((value) => Boolean(value.uaid || value.sessionId || value.namespace || value.userId), {
+    message: 'Provide at least one scope identifier (uaid, sessionId, namespace, or userId).',
+  });
+
+const memoryContextSchema = z.object({
+  scope: memoryScopeSchema,
+  limit: z.number().int().positive().max(200).optional(),
+  includeSummary: z.boolean().optional(),
+});
+
+const memoryNoteSchema = z.object({
+  scope: memoryScopeSchema,
+  content: z.string().min(1),
+});
+
+const memoryClearSchema = z.object({
+  scope: memoryScopeSchema,
+});
+
+const memorySearchSchema = z.object({
+  scope: memoryScopeSchema,
+  query: z.string().min(1),
+  limit: z.number().int().positive().max(200).optional(),
+});
 
 const waitForRegistrationInput = z.object({
   attemptId: z.string(),
@@ -371,9 +408,13 @@ const rawToolDefinitions = [
     handler: (input: ChatMessageInput) =>
       withBroker(async (client) => {
         const { sessionId, uaid, message, auth, streaming } = input;
+        const scopeForMemory: MemoryScope = { sessionId: sessionId ?? undefined, uaid: uaid ?? undefined };
         if (sessionId) {
           const payload: ChatSendMessagePayload = { sessionId, message, auth, streaming };
-          return client.chat.sendMessage(payload);
+          await recordMemory(scopeForMemory, 'user', message, 'hol.chat.sendMessage');
+          const response = await client.chat.sendMessage(payload);
+          await recordMemory(scopeForMemory, 'assistant', stringifyForMemory(response), 'hol.chat.sendMessage');
+          return response;
         }
 
         if (!uaid) {
@@ -394,7 +435,15 @@ const rawToolDefinitions = [
           streaming,
         };
 
-        return client.chat.sendMessage(payload);
+        scopeForMemory.sessionId = derivedSessionId;
+
+        await recordMemory(scopeForMemory, 'user', message, 'hol.chat.sendMessage');
+
+        const response = await client.chat.sendMessage(payload);
+
+        await recordMemory(scopeForMemory, 'assistant', stringifyForMemory(response), 'hol.chat.sendMessage');
+
+        return response;
       }, 'hol.chat.sendMessage'),
   },
   {
@@ -416,19 +465,6 @@ const rawToolDefinitions = [
     schema: sessionIdInput,
     handler: ({ sessionId }: z.infer<typeof sessionIdInput>) =>
       withBroker((client) => client.chat.endSession(sessionId), 'hol.chat.end'),
-  },
-  {
-    name: 'hol.listProtocols',
-    description: 'List all registered protocols/adapters known to the broker.',
-    schema: emptyObject,
-    handler: () => runBrokerCall('hol.listProtocols', () => withBroker((client) => client.listProtocols(), 'hol.listProtocols')),
-  },
-  {
-    name: 'hol.detectProtocol',
-    description: 'Detect the expected protocol for an inbound request payload.',
-    schema: detectProtocolInput,
-    handler: (input: z.infer<typeof detectProtocolInput>) =>
-      runBrokerCall('hol.detectProtocol', () => withBroker((client) => client.detectProtocol(input as any), 'hol.detectProtocol')),
   },
   {
     name: 'hol.stats',
@@ -504,6 +540,47 @@ const rawToolDefinitions = [
     description: 'Buy registry credits via X402 using an EVM private key.',
     schema: buyX402Input,
     handler: (input: BuyX402Input) => withBroker((client) => client.buyCreditsWithX402(input), 'hol.x402.buyCredits'),
+  },
+  {
+    name: 'hol.memory.context',
+    description: 'Fetch recent memory entries and optional summary for a scope.',
+    schema: memoryContextSchema,
+    handler: async (input: z.infer<typeof memoryContextSchema>) => {
+      const service = ensureMemoryEnabled();
+      return service.getContext({
+        scope: input.scope,
+        limit: input.limit,
+        includeSummary: input.includeSummary ?? true,
+      });
+    },
+  },
+  {
+    name: 'hol.memory.note',
+    description: 'Save a free-form note into memory for the given scope.',
+    schema: memoryNoteSchema,
+    handler: async (input: z.infer<typeof memoryNoteSchema>) => {
+      const service = ensureMemoryEnabled();
+      return service.note(input.scope, input.content);
+    },
+  },
+  {
+    name: 'hol.memory.clear',
+    description: 'Clear memory entries and summaries for the given scope.',
+    schema: memoryClearSchema,
+    handler: async (input: z.infer<typeof memoryClearSchema>) => {
+      const service = ensureMemoryEnabled();
+      const removed = await service.clear(input.scope);
+      return { removed };
+    },
+  },
+  {
+    name: 'hol.memory.search',
+    description: 'Keyword search across stored memory for a scope.',
+    schema: memorySearchSchema,
+    handler: async (input: z.infer<typeof memorySearchSchema>) => {
+      const service = ensureMemoryEnabled();
+      return service.search({ scope: input.scope, query: input.query, limit: input.limit });
+    },
   },
   {
     name: 'workflow.discovery',
@@ -582,6 +659,13 @@ const rawToolDefinitions = [
 
 export const toolDefinitions: ToolDefinition[] = rawToolDefinitions as unknown as ToolDefinition[];
 
+function ensureMemoryEnabled() {
+  if (!memoryService || !memoryService.isEnabled()) {
+    throw new Error('Memory is disabled or unavailable. Set MEMORY_ENABLED=1 and ensure the configured backend is installed.');
+  }
+  return memoryService;
+}
+
 function formatPipelineResult(result: PipelineRunResult<unknown>) {
   const contextRecord =
     result.context && typeof result.context === 'object' ? (result.context as Record<string, unknown>) : {};
@@ -613,6 +697,14 @@ export function buildLoggedTool<S extends z.ZodTypeAny>(definition: ToolDefiniti
         const parsedInput = definition.schema.parse(args);
         logger.debug({ requestId, tool: definition.name }, 'tool.invoke');
         const result = await definition.handler(parsedInput as z.infer<S>);
+        if (memoryService && memoryService.isEnabled()) {
+          const scopeForMemory = deriveScopeFromArgs(parsedInput);
+          if (hasScope(scopeForMemory)) {
+            void memoryService
+              .recordToolEvent(definition.name, scopeForMemory, { input: parsedInput, result })
+              .catch((error) => logger.warn({ requestId, tool: definition.name, error }, 'memory.capture.failed'));
+          }
+        }
         logger.info(
           {
             requestId,
@@ -724,6 +816,42 @@ async function safeBalanceLookup(label: 'hedera' | 'x402', accountId: string) {
   }
 }
 
+function deriveScopeFromArgs(args: unknown): MemoryScope {
+  if (!args || typeof args !== 'object') return {};
+  const record = args as Record<string, unknown>;
+  const scope: MemoryScope = {};
+  // We keep this loose: whichever identifiers the tool provides, we pass along for scoping.
+  if (typeof record.sessionId === 'string') scope.sessionId = record.sessionId;
+  if (typeof record.uaid === 'string') scope.uaid = record.uaid;
+  if (typeof record.namespace === 'string') scope.namespace = record.namespace;
+  if (typeof record.userId === 'string') scope.userId = record.userId;
+  return scope;
+}
+
+function hasScope(scope: MemoryScope) {
+  return Boolean(scope.sessionId || scope.uaid || scope.namespace || scope.userId);
+}
+
+function stringifyForMemory(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value === undefined || value === null) return '';
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+async function recordMemory(scope: MemoryScope, role: 'user' | 'assistant' | 'note' | 'tool', content: string, toolName: string) {
+  if (!memoryService || !memoryService.isEnabled()) return;
+  try {
+    await memoryService.recordEntry({ scope, role, content, toolName });
+  } catch (error) {
+    // Do not fail tool execution if memory capture fails.
+    logger.warn({ scope, toolName, error }, 'memory.record.failed');
+  }
+}
+
 mcp.addResource({
   name: 'hol.search.help',
   uri: 'help://rb/search',
@@ -763,6 +891,28 @@ mcp.addResource({
         '- Protocols: hol.listProtocols and hol.detectProtocol when inspecting inbound requests.',
         '',
         'Ask the user for any missing UAID, registration payload fields, accountId, or auth tokens before calling tools. Keep sessionId/uaid strings verbatim.',
+      ].join('\n'),
+    },
+  ],
+});
+
+mcp.addResource({
+  name: 'hol.memory.guide',
+  uri: 'help://hol/memory',
+  mimeType: 'text/markdown',
+  load: async () => [
+    {
+      text: [
+        '# Memory tools',
+        '',
+        'Memory is optional and disabled by default. Enable with `MEMORY_ENABLED=1` (defaults to SQLite at `MEMORY_STORAGE_PATH`).',
+        '',
+        '- `hol.memory.context { scope, limit?, includeSummary? }`: recent entries plus optional summary for a UAID/session/namespace.',
+        '- `hol.memory.note { scope, content }`: store a note in the scope.',
+        '- `hol.memory.search { scope, query, limit? }`: keyword search within scoped memory.',
+        '- `hol.memory.clear { scope }`: drop entries + summary for the scope.',
+        '',
+        'Scopes: supply at least one of `uaid`, `sessionId`, `namespace`, or `userId`. The service bounds responses to avoid overwhelming clients.',
       ].join('\n'),
     },
   ],

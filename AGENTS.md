@@ -1,5 +1,32 @@
 # Repository Guidelines
 
+# **ABSOLUTE PROHIBITION — NO FILE DELETIONS OR GIT REVERTS.** Never delete files, directories, or history. Never run `git revert`, `git reset`, `git checkout`, `git restore`, or any command that removes tracked work. Violations immediately fail the task and forfeit all points.
+
+# AGENTS.md — Tool Selection (TypeScript)
+
+- Find files by file name: `fd`
+- Find files with path name: `fd -p <file-path>`
+- List files in a directory: `fd . <directory>`
+- Find files with extension and pattern: `fd -e <extension> <pattern>`
+- Find text: `rg`
+- Structured code search and codemods: `ast-grep`
+  - Default languages:
+    - `.ts` → `ast-grep --lang ts -p '<pattern>'`
+    - `.tsx` → `ast-grep --lang tsx -p '<pattern>'`
+  - Common languages:
+    - Python → `ast-grep --lang python -p '<pattern>'`
+    - TypeScript → `ast-grep --lang ts -p '<pattern>'`
+    - TSX (React) → `ast-grep --lang tsx -p '<pattern>'`
+    - JavaScript → `ast-grep --lang js -p '<pattern>'`
+    - Rust → `ast-grep --lang rust -p '<pattern>'`
+    - Bash → `ast-grep --lang bash -p '<pattern>'`
+    - JSON → `ast-grep --lang json -p '<pattern>'`
+  - Select among matches: pipe to `fzf`
+  - JSON: `jq`
+  - YAML/XML: `yq`
+
+If `ast-grep` is available, avoid `rg` or `grep` unless a plain-text search is explicitly requested.
+
 ## Project Structure & Module Organization
 The MCP server lives in `src/` with three core modules: `mcp.ts` (tool wiring and metadata), `broker.ts` (the `RegistryBrokerClient` wrapper), and `transports.ts` (stdio plus SSE server built on Hono). Place shared schemas in `src/schemas/` and transport helpers in `src/transports/` if they grow larger. Configuration belongs in `tsconfig.json`, environment defaults in `.env.example`, and any integration fixtures under `examples/`. Keep tests in `tests/` mirroring the source tree so `tests/mcp/tools.spec.ts` maps cleanly to `src/mcp.ts`.
 
@@ -69,6 +96,9 @@ Each workflow emits a structured report (steps, timings, context) whether execut
 - X402 workflows also require EVM wallet details (see `examples/workflows/workflow.x402*.json`) plus any ledger challenge metadata referenced in the payload.
 - Tool-suite fixtures (optional): `TEST_UAID`, `TEST_CHAT_UAID`, `TEST_REGISTRATION_ATTEMPT_ID`, and `BROKER_PROTOCOL_TOOLS`. Populate them (see `.env.example`) so `pnpm test:tools` can exercise UAID/chat flows locally or skip protocol checks when the broker doesn’t expose those endpoints; leave blank to rely on auto-discovered UAIDs/attempt IDs from the preceding scenarios.
 Workflow pipelines declare their required env vars and will fail fast with a descriptive error if anything is missing; payload-specific secrets (OpenRouter tokens, Agentverse headers, bearer tokens) should be supplied via `.env` or injected by your CLI before invoking the workflow.
+
+### Memory (optional)
+- Set `MEMORY_ENABLED=1` to enable local memory capture (SQLite by default; see `.env.example` for limits and store selection). When enabled, workflows like `workflow.chatSmoke`, `workflow.openrouterChat`, `workflow.historyTopUp`, `workflow.registryBrokerShowcase`, and `workflow.fullRegistration` will load scoped context (uaid/session/namespace) and append discovery/chat traces. Pass `disableMemory: true` in workflow inputs to opt out even when memory is enabled.
 
 ### Running `pnpm workflow:register`
 1. The CLI prompts for display name, alias, description, MCP URL, chat message, and report path (defaults provided).

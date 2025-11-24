@@ -107,8 +107,6 @@ const schemaSamples: Record<string, { valid: unknown; invalid?: unknown }> = {
   'hol.chat.history': { valid: { sessionId: 's1' }, invalid: {} },
   'hol.chat.compact': { valid: { sessionId: 's1', preserveEntries: 2 }, invalid: { sessionId: 's1', preserveEntries: -1 } },
   'hol.chat.end': { valid: { sessionId: 's1' }, invalid: {} },
-  'hol.listProtocols': { valid: {} },
-  'hol.detectProtocol': { valid: { headers: { 'content-type': 'application/json' }, body: '{}' }, invalid: { headers: { foo: 1 } } },
   'hol.stats': { valid: {} },
   'hol.metricsSummary': { valid: {} },
   'hol.dashboardStats': { valid: {} },
@@ -131,6 +129,13 @@ const schemaSamples: Record<string, { valid: unknown; invalid?: unknown }> = {
     valid: { accountId: '0.0.123', credits: 10, evmPrivateKey: '0xabc' },
     invalid: { accountId: '', credits: 0, evmPrivateKey: '' },
   },
+  'hol.memory.context': {
+    valid: { scope: { uaid: 'uaid:1' }, limit: 5, includeSummary: true },
+    invalid: { scope: {} },
+  },
+  'hol.memory.note': { valid: { scope: { sessionId: 's1' }, content: 'note' }, invalid: { scope: { sessionId: 's1' }, content: '' } },
+  'hol.memory.clear': { valid: { scope: { namespace: 'demo' } }, invalid: { scope: {} } },
+  'hol.memory.search': { valid: { scope: { uaid: 'uaid:1' }, query: 'hello', limit: 5 }, invalid: { scope: { uaid: 'uaid:1' }, query: '' } },
   'workflow.discovery': { valid: { query: 'hash', limit: 5 }, invalid: { limit: 0 } },
   'workflow.registerMcp': { valid: { payload: baseRegistrationPayload }, invalid: { payload: null } },
   'workflow.chatSmoke': { valid: { uaid: 'uaid-123', message: 'hi' }, invalid: { uaid: '' } },
@@ -192,8 +197,6 @@ describe('mcp tool definitions', () => {
       'hol.chat.history',
       'hol.chat.compact',
       'hol.chat.end',
-      'hol.listProtocols',
-      'hol.detectProtocol',
       'hol.stats',
       'hol.metricsSummary',
       'hol.dashboardStats',
@@ -204,6 +207,10 @@ describe('mcp tool definitions', () => {
       'hol.credits.balance',
       'hol.x402.minimums',
       'hol.x402.buyCredits',
+      'hol.memory.context',
+      'hol.memory.note',
+      'hol.memory.clear',
+      'hol.memory.search',
       'workflow.discovery',
       'workflow.registerMcp',
       'workflow.chatSmoke',
@@ -280,15 +287,11 @@ describe('mcp tool definitions', () => {
   });
 
   it('exposes read-only protocol and stats utilities', async () => {
-    await getTool('hol.listProtocols').handler({});
-    await getTool('hol.detectProtocol').handler({ headers: { foo: 'bar' } });
     await getTool('hol.stats').handler({});
     await getTool('hol.metricsSummary').handler({});
     await getTool('hol.dashboardStats').handler({});
     await getTool('hol.websocketStats').handler({});
 
-    expect(fakeClient.listProtocols).toHaveBeenCalled();
-    expect(fakeClient.detectProtocol).toHaveBeenCalledWith({ headers: { foo: 'bar' } });
     expect(fakeClient.stats).toHaveBeenCalled();
     expect(fakeClient.metricsSummary).toHaveBeenCalled();
     expect(fakeClient.dashboardStats).toHaveBeenCalled();

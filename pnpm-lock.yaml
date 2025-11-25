@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@hashgraphonline/standards-sdk':
-        specifier: ^0.1.137
-        version: 0.1.137(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(@solana/sysvars@3.0.3(typescript@5.9.3))(ansi-regex@6.2.2)(ansi-styles@6.2.3)(bufferutil@4.0.9)(debug@4.4.3)(encoding@0.1.13)(ioredis@5.8.2)(protobufjs@7.5.4)(strip-ansi@7.1.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(ws@8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10))
+        specifier: ^0.1.139
+        version: 0.1.139(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(@solana/sysvars@3.0.3(typescript@5.9.3))(ansi-regex@6.2.2)(ansi-styles@6.2.3)(bufferutil@4.0.9)(debug@4.4.3)(encoding@0.1.13)(ioredis@5.8.2)(protobufjs@7.5.4)(strip-ansi@7.1.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(ws@8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10))
       '@hono/node-server':
         specifier: ^1.19.6
         version: 1.19.6(hono@4.10.5)
@@ -643,8 +643,8 @@ packages:
   '@hashgraphonline/standards-sdk@0.1.134':
     resolution: {integrity: sha512-nn+QLeS/Irlabdu6i8mZWoZT0/obJWgsTNO3NH3EgIwbnf6XVxKeAOrUu3np8vuB1pxsu+Ch89i0gopZ3KuPAA==}
 
-  '@hashgraphonline/standards-sdk@0.1.137':
-    resolution: {integrity: sha512-ITIxxC6zUDNP9aLjwqVlKSYdB7TI8HExge9d2dMFiBFupEsRxYIDT0Vm4fWvBl9sgj0BwzW3nfJVQlUv13hP/Q==}
+  '@hashgraphonline/standards-sdk@0.1.139':
+    resolution: {integrity: sha512-I1UuaBKG4aR27tAmX+tz8bNwn6nAy4ufeHjirkrmcrBLnqLII/IDLwYUFY5brk7NeV0qF+cMsljSuoco1SNOsg==}
     peerDependencies:
       ioredis: '*'
     peerDependenciesMeta:
@@ -5731,14 +5731,14 @@ snapshots:
       - utf-8-validate
       - ws
 
-  '@hashgraphonline/standards-sdk@0.1.137(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(@solana/sysvars@3.0.3(typescript@5.9.3))(ansi-regex@6.2.2)(ansi-styles@6.2.3)(bufferutil@4.0.9)(debug@4.4.3)(encoding@0.1.13)(ioredis@5.8.2)(protobufjs@7.5.4)(strip-ansi@7.1.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(ws@8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10))':
+  '@hashgraphonline/standards-sdk@0.1.139(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(@solana/sysvars@3.0.3(typescript@5.9.3))(ansi-regex@6.2.2)(ansi-styles@6.2.3)(bufferutil@4.0.9)(debug@4.4.3)(encoding@0.1.13)(ioredis@5.8.2)(protobufjs@7.5.4)(strip-ansi@7.1.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(ws@8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10))':
     dependencies:
       '@hashgraph/proto': 2.24.0(ansi-regex@6.2.2)(ansi-styles@6.2.3)(debug@4.4.3)(protobufjs@7.5.4)(strip-ansi@7.1.2)
       '@hashgraph/sdk': 2.77.0
       '@hashgraphonline/hashinal-wc': 2.0.1(@solana/sysvars@3.0.3(typescript@5.9.3))(ansi-regex@6.2.2)(ansi-styles@6.2.3)(bufferutil@4.0.9)(debug@4.4.3)(encoding@0.1.13)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(ioredis@5.8.2)(protobufjs@7.5.4)(strip-ansi@7.1.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(ws@8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10))(zod@3.25.76)
       '@hiero-did-sdk/registrar': 0.1.2
       '@hiero-did-sdk/resolver': 0.1.2
-      '@kiloscribe/inscription-sdk': 2.0.3(@hashgraph/sdk@2.77.0)(@hashgraphonline/standards-sdk@0.1.137(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(@solana/sysvars@3.0.3(typescript@5.9.3))(ansi-regex@6.2.2)(ansi-styles@6.2.3)(bufferutil@4.0.9)(debug@4.4.3)(encoding@0.1.13)(ioredis@5.8.2)(protobufjs@7.5.4)(strip-ansi@7.1.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(ws@8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10)))(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(bufferutil@4.0.9)(debug@4.4.3)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(utf-8-validate@5.0.10)
+      '@kiloscribe/inscription-sdk': 2.0.3(@hashgraph/sdk@2.77.0)(@hashgraphonline/standards-sdk@0.1.139(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(@solana/sysvars@3.0.3(typescript@5.9.3))(ansi-regex@6.2.2)(ansi-styles@6.2.3)(bufferutil@4.0.9)(debug@4.4.3)(encoding@0.1.13)(ioredis@5.8.2)(protobufjs@7.5.4)(strip-ansi@7.1.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(ws@8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10)))(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(bufferutil@4.0.9)(debug@4.4.3)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(utf-8-validate@5.0.10)
       '@noble/curves': 2.0.1
       agent0-sdk: 0.2.1(bufferutil@4.0.9)(encoding@0.1.13)(utf-8-validate@5.0.10)
       axios: 1.13.2(debug@4.4.3)
@@ -5979,7 +5979,7 @@ snapshots:
     dependencies:
       '@hashgraph/hedera-wallet-connect': 2.0.3(@hashgraph/sdk@2.77.0)(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))
       '@hashgraph/sdk': 2.77.0
-      '@hashgraphonline/standards-sdk': 0.1.137(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(@solana/sysvars@3.0.3(typescript@5.9.3))(ansi-regex@6.2.2)(ansi-styles@6.2.3)(bufferutil@4.0.9)(debug@4.4.3)(encoding@0.1.13)(ioredis@5.8.2)(protobufjs@7.5.4)(strip-ansi@7.1.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(ws@8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10))
+      '@hashgraphonline/standards-sdk': 0.1.139(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(@solana/sysvars@3.0.3(typescript@5.9.3))(ansi-regex@6.2.2)(ansi-styles@6.2.3)(bufferutil@4.0.9)(debug@4.4.3)(encoding@0.1.13)(ioredis@5.8.2)(protobufjs@7.5.4)(strip-ansi@7.1.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(ws@8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10))
       axios: 1.13.2(debug@4.4.3)
       date-fns: 4.1.0
       file-type: 21.1.0
@@ -6053,11 +6053,11 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@kiloscribe/inscription-sdk@2.0.3(@hashgraph/sdk@2.77.0)(@hashgraphonline/standards-sdk@0.1.137(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(@solana/sysvars@3.0.3(typescript@5.9.3))(ansi-regex@6.2.2)(ansi-styles@6.2.3)(bufferutil@4.0.9)(debug@4.4.3)(encoding@0.1.13)(ioredis@5.8.2)(protobufjs@7.5.4)(strip-ansi@7.1.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(ws@8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10)))(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(bufferutil@4.0.9)(debug@4.4.3)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(utf-8-validate@5.0.10)':
+  '@kiloscribe/inscription-sdk@2.0.3(@hashgraph/sdk@2.77.0)(@hashgraphonline/standards-sdk@0.1.139(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(@solana/sysvars@3.0.3(typescript@5.9.3))(ansi-regex@6.2.2)(ansi-styles@6.2.3)(bufferutil@4.0.9)(debug@4.4.3)(encoding@0.1.13)(ioredis@5.8.2)(protobufjs@7.5.4)(strip-ansi@7.1.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(ws@8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10)))(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(bufferutil@4.0.9)(debug@4.4.3)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(utf-8-validate@5.0.10)':
     dependencies:
       '@hashgraph/hedera-wallet-connect': 2.0.4-canary.3ca04e9.0(@hashgraph/sdk@2.77.0)(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))
       '@hashgraph/sdk': 2.77.0
-      '@hashgraphonline/standards-sdk': 0.1.137(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(@solana/sysvars@3.0.3(typescript@5.9.3))(ansi-regex@6.2.2)(ansi-styles@6.2.3)(bufferutil@4.0.9)(debug@4.4.3)(encoding@0.1.13)(ioredis@5.8.2)(protobufjs@7.5.4)(strip-ansi@7.1.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(ws@8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10))
+      '@hashgraphonline/standards-sdk': 0.1.139(@reown/appkit@1.8.9(bufferutil@4.0.9)(encoding@0.1.13)(ioredis@5.8.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.12))(@solana/sysvars@3.0.3(typescript@5.9.3))(ansi-regex@6.2.2)(ansi-styles@6.2.3)(bufferutil@4.0.9)(debug@4.4.3)(encoding@0.1.13)(ioredis@5.8.2)(protobufjs@7.5.4)(strip-ansi@7.1.2)(typescript@5.9.3)(utf-8-validate@5.0.10)(ws@8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10))
       axios: 1.13.2(debug@4.4.3)
       date-fns: 4.1.0
       file-type: 21.1.0

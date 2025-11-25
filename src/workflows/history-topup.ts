@@ -3,6 +3,7 @@ import { RegistryBrokerError } from '@hashgraphonline/standards-sdk';
 import { scaffoldWorkflow } from './scaffold';
 import type { PipelineDefinition } from './types';
 import { withBroker } from '../broker';
+import { loadMemoryContext, recordMemory } from './utils/memory';
 
 interface CreditTopUpConfig {
   accountId: string;
@@ -18,6 +19,7 @@ export interface HistoryTopUpInput {
   historyTtlSeconds?: number;
   preserveEntries?: number;
   creditTopUp: CreditTopUpConfig;
+  disableMemory?: boolean;
 }
 
 interface HistoryTopUpContext {
@@ -25,6 +27,8 @@ interface HistoryTopUpContext {
   transcripts: unknown[];
   compactions: unknown[];
   purchases: unknown[];
+  memoryOptOut?: boolean;
+  uaid: string;
 }
 
 const historyTopUpDefinition: PipelineDefinition<HistoryTopUpInput, HistoryTopUpContext> = {
@@ -32,8 +36,17 @@ const historyTopUpDefinition: PipelineDefinition<HistoryTopUpInput, HistoryTopUp
   description: 'Run a chat session, trigger credit purchases on history errors, and confirm recovery.',
   version: '1.0.0',
   requiredEnv: ['REGISTRY_BROKER_API_KEY'],
-  createContext: () => ({ transcripts: [], compactions: [], purchases: [] }),
+  createContext: (input) => ({ transcripts: [], compactions: [], purchases: [], memoryOptOut: input.disableMemory, uaid: input.uaid }),
   steps: [
+    {
+      name: 'workflow.historyTopUp.memory.load',
+      skip: ({ input }) => Boolean(input.disableMemory),
+      run: async ({ input, context }) => {
+        const scope = { uaid: input.uaid };
+        const loaded = await loadMemoryContext({ scope, optOut: context.memoryOptOut });
+        return loaded ?? { skipped: true };
+      },
+    },
     {
       name: 'hol.chat.createSession',
       run: async ({ input, context }) => {
@@ -51,6 +64,13 @@ const historyTopUpDefinition: PipelineDefinition<HistoryTopUpInput, HistoryTopUp
         const messages = input.messages?.length ? input.messages : ['Hello from workflow.historyTopUp'];
         const last = messages[messages.length - 1];
         for (const message of messages) {
+          await recordMemory({
+            scope: { uaid: input.uaid, sessionId: context.sessionId },
+            role: 'user',
+            content: message,
+            toolName: 'workflow.historyTopUp',
+            optOut: context.memoryOptOut,
+          });
           await withBroker((client) =>
             client.chat.sendMessage({ sessionId: context.sessionId!, auth: input.auth, message, uaid: input.uaid }),
           );
@@ -64,6 +84,13 @@ const historyTopUpDefinition: PipelineDefinition<HistoryTopUpInput, HistoryTopUp
         if (!context.sessionId) throw new Error('Missing chat session');
         const history = await withBroker((client) => client.chat.getHistory(context.sessionId!));
         context.transcripts.push(history);
+        await recordMemory({
+          scope: { uaid: input.uaid, sessionId: context.sessionId },
+          role: 'event',
+          content: JSON.stringify({ history }),
+          toolName: 'workflow.historyTopUp',
+          optOut: context.memoryOptOut,
+        });
         return history;
       },
     },
@@ -95,6 +122,13 @@ const historyTopUpDefinition: PipelineDefinition<HistoryTopUpInput, HistoryTopUp
               client.chat.compactHistory({ sessionId, preserveEntries }),
             );
             context.compactions.push(retry);
+            await recordMemory({
+              scope: { uaid: input.uaid, sessionId },
+              role: 'event',
+              content: JSON.stringify({ purchase, retry }),
+              toolName: 'workflow.historyTopUp',
+              optOut: context.memoryOptOut,
+            });
             return retry;
           }
           throw error;
@@ -107,6 +141,13 @@ const historyTopUpDefinition: PipelineDefinition<HistoryTopUpInput, HistoryTopUp
         if (!context.sessionId) throw new Error('Missing chat session');
         const snapshot = await withBroker((client) => client.chat.getHistory(context.sessionId!));
         context.transcripts.push(snapshot);
+        await recordMemory({
+          scope: { uaid: context.uaid, sessionId: context.sessionId },
+          role: 'event',
+          content: JSON.stringify({ snapshot }),
+          toolName: 'workflow.historyTopUp',
+          optOut: context.memoryOptOut,
+        });
         return snapshot;
       },
     },

@@ -14,7 +14,7 @@ const autoTopUpConfig = config.autoTopUpEnabled
   : undefined;
 
 const broker = new RegistryBrokerClient({
-  baseUrl: config.registryBrokerUrl,
+  baseUrl: normalizeRegistryUrl(config.registryBrokerUrl),
   apiKey: config.registryBrokerApiKey,
   fetchImplementation: undiciFetch as unknown as typeof fetch,
   registrationAutoTopUp: autoTopUpConfig,
@@ -134,4 +134,29 @@ function formatBrokerError(error: unknown, label?: string): Error {
     return new Error(`${prefix} (${error.status}${statusText}): ${body}`);
   }
   return error instanceof Error ? error : new Error(String(error));
+}
+
+function normalizeRegistryUrl(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl);
+    // Map legacy host to the canonical hol registry host.
+    if (parsed.hostname === 'registry.hashgraphonline.com') {
+      parsed.hostname = 'hol.org';
+      parsed.pathname = '/registry/api/v1';
+      parsed.search = '';
+      parsed.hash = '';
+      return stripTrailingSlash(parsed.toString());
+    }
+    // Ensure path ends with /api/v1
+    const cleanPath = parsed.pathname.replace(/\/+$/, '');
+    parsed.pathname = cleanPath.endsWith('/api/v1') ? cleanPath : `${cleanPath || ''}/api/v1`;
+    return stripTrailingSlash(parsed.toString());
+  } catch {
+    // Fallback to raw URL if parsing fails.
+    return rawUrl;
+  }
+}
+
+function stripTrailingSlash(value: string) {
+  return value.endsWith('/') ? value.slice(0, -1) : value;
 }

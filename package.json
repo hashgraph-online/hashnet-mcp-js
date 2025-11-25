@@ -1,6 +1,6 @@
 {
   "name": "@hol-org/hashnet-mcp",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "description": "HOL MCP server for agentic search, discovery, registration, chat, and more with the Hashgraph Online Registry Broker.",
   "type": "module",
   "main": "./dist/index.js",
@@ -88,7 +88,7 @@
     "vitest": "^2.1.4"
   },
   "dependencies": {
-    "@hashgraphonline/standards-sdk": "^0.1.137",
+    "@hashgraphonline/standards-sdk": "^0.1.139",
     "@hono/node-server": "^1.19.6",
     "@modelcontextprotocol/sdk": "^1.21.1",
     "bottleneck": "^2.19.5",
@@ -100,7 +100,10 @@
     "undici": "^7.16.0",
     "zod": "^4.1.12"
   },
+  "optionalDependencies": {
+    "better-sqlite3": "^11.5.0"
+  },
   "overrides": {
-    "@hashgraphonline/standards-sdk": "^0.1.137"
+    "@hashgraphonline/standards-sdk": "^0.1.139"
   }
 }

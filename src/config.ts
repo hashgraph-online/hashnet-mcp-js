@@ -33,6 +33,20 @@ const envSchema = z
       .optional()
       .transform((value) => value === '1'),
     HTTP_STREAM_PORT: z.coerce.number().int().positive().optional(),
+    MEMORY_ENABLED: z
+      .enum(['0', '1'])
+      .optional()
+      .transform((value) => value === '1'),
+    MEMORY_STORE: z.enum(['file', 'sqlite', 'rocksdb', 'memory', 'redis']).optional(),
+    MEMORY_STORAGE_PATH: z.string().default('tmp/memory.json'),
+    MEMORY_MAX_ENTRIES_PER_SCOPE: z.coerce.number().int().positive().optional(),
+    MEMORY_DEFAULT_TTL_SECONDS: z.coerce.number().int().positive().optional(),
+    MEMORY_SUMMARY_TRIGGER: z.coerce.number().int().positive().optional(),
+    MEMORY_MAX_RETURN_ENTRIES: z.coerce.number().int().positive().optional(),
+    MEMORY_CAPTURE_TOOLS: z
+      .enum(['0', '1'])
+      .optional()
+      .transform((value) => value === '1'),
   })
   .superRefine((val, ctx) => {
     const hasAccount = Boolean(val.HEDERA_ACCOUNT_ID);
@@ -67,6 +81,14 @@ const parsed = envSchema.safeParse({
   WORKFLOW_DRY_RUN: normalized(process.env.WORKFLOW_DRY_RUN),
   BROKER_AUTO_TOP_UP: normalized(process.env.BROKER_AUTO_TOP_UP),
   HTTP_STREAM_PORT: normalized(process.env.HTTP_STREAM_PORT),
+  MEMORY_ENABLED: normalized(process.env.MEMORY_ENABLED),
+  MEMORY_STORE: normalized(process.env.MEMORY_STORE),
+  MEMORY_STORAGE_PATH: normalized(process.env.MEMORY_STORAGE_PATH),
+  MEMORY_MAX_ENTRIES_PER_SCOPE: normalized(process.env.MEMORY_MAX_ENTRIES_PER_SCOPE),
+  MEMORY_DEFAULT_TTL_SECONDS: normalized(process.env.MEMORY_DEFAULT_TTL_SECONDS),
+  MEMORY_SUMMARY_TRIGGER: normalized(process.env.MEMORY_SUMMARY_TRIGGER),
+  MEMORY_MAX_RETURN_ENTRIES: normalized(process.env.MEMORY_MAX_RETURN_ENTRIES),
+  MEMORY_CAPTURE_TOOLS: normalized(process.env.MEMORY_CAPTURE_TOOLS),
 });
 
 if (!parsed.success) {
@@ -112,6 +134,16 @@ export const config = {
   workflowDryRun: parsed.data.WORKFLOW_DRY_RUN ?? false,
   httpStreamPort: parsed.data.HTTP_STREAM_PORT,
   logLevel: parsed.data.LOG_LEVEL,
+  memory: {
+    enabled: parsed.data.MEMORY_ENABLED ?? false,
+    store: parsed.data.MEMORY_STORE ?? 'file',
+    path: parsed.data.MEMORY_STORAGE_PATH ?? 'tmp/memory.json',
+    maxEntriesPerScope: parsed.data.MEMORY_MAX_ENTRIES_PER_SCOPE ?? 200,
+    defaultTtlSeconds: parsed.data.MEMORY_DEFAULT_TTL_SECONDS ?? 24 * 60 * 60,
+    summaryTrigger: parsed.data.MEMORY_SUMMARY_TRIGGER ?? 100,
+    maxReturnEntries: parsed.data.MEMORY_MAX_RETURN_ENTRIES ?? 50,
+    captureTools: parsed.data.MEMORY_CAPTURE_TOOLS ?? true,
+  },
 };
 
 export type AppConfig = typeof config;

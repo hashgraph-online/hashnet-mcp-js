@@ -1,6 +1,7 @@
 import { scaffoldWorkflow } from './scaffold';
 import type { PipelineDefinition } from './types';
 import { withBroker } from '../broker';
+import { loadMemoryContext, recordMemory } from './utils/memory';
 
 interface OpenRouterChatInput {
   modelId: string;
@@ -8,12 +9,14 @@ interface OpenRouterChatInput {
   message: string;
   authToken?: string;
   historyTtlSeconds?: number;
+  disableMemory?: boolean;
 }
 
 interface OpenRouterChatContext {
   uaid?: string;
   sessionId?: string;
   transcript?: unknown;
+  memoryOptOut?: boolean;
 }
 
 const openRouterChatDefinition: PipelineDefinition<OpenRouterChatInput, OpenRouterChatContext> = {
@@ -21,8 +24,17 @@ const openRouterChatDefinition: PipelineDefinition<OpenRouterChatInput, OpenRout
   description: 'Discover an OpenRouter model and run a chat message against it.',
   version: '1.0.0',
   requiredEnv: ['REGISTRY_BROKER_API_KEY'],
-  createContext: () => ({}),
+  createContext: (input) => ({ memoryOptOut: input.disableMemory }),
   steps: [
+    {
+      name: 'workflow.openrouterChat.memory.load',
+      skip: ({ input }) => Boolean(input.disableMemory),
+      run: async ({ input, context }) => {
+        const scope = { namespace: 'openrouter', userId: input.modelId };
+        const loaded = await loadMemoryContext({ scope, optOut: context.memoryOptOut });
+        return loaded ?? { skipped: true };
+      },
+    },
     {
       name: 'hol.search',
       run: async ({ input, context }) => {
@@ -57,9 +69,24 @@ const openRouterChatDefinition: PipelineDefinition<OpenRouterChatInput, OpenRout
       run: async ({ input, context }) => {
         if (!context.sessionId) throw new Error('Missing chat session');
         const auth = input.authToken ? { type: 'bearer' as const, token: input.authToken } : undefined;
-        return withBroker((client) =>
+        await recordMemory({
+          scope: { uaid: context.uaid, sessionId: context.sessionId },
+          role: 'user',
+          content: input.message,
+          toolName: 'workflow.openrouterChat',
+          optOut: context.memoryOptOut,
+        });
+        const response = await withBroker((client) =>
           client.chat.sendMessage({ sessionId: context.sessionId!, auth, message: input.message, uaid: context.uaid }),
         );
+        await recordMemory({
+          scope: { uaid: context.uaid, sessionId: context.sessionId },
+          role: 'assistant',
+          content: JSON.stringify(response),
+          toolName: 'workflow.openrouterChat',
+          optOut: context.memoryOptOut,
+        });
+        return response;
       },
     },
     {
@@ -69,6 +96,13 @@ const openRouterChatDefinition: PipelineDefinition<OpenRouterChatInput, OpenRout
         if (!context.sessionId) throw new Error('Missing chat session');
         const history = await withBroker((client) => client.chat.getHistory(context.sessionId!));
         context.transcript = history;
+        await recordMemory({
+          scope: { uaid: context.uaid, sessionId: context.sessionId },
+          role: 'event',
+          content: JSON.stringify({ history }),
+          toolName: 'workflow.openrouterChat',
+          optOut: context.memoryOptOut,
+        });
         return history;
       },
     },

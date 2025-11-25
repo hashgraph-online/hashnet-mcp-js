@@ -1,0 +1,59 @@
+name: Publish Canary
+
+on:
+  push:
+    branches-ignore:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+concurrency:
+  group: publish-canary-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish-canary:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.10.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test
+        run: pnpm test:run
+
+      - name: Build
+        run: pnpm build
+
+      - name: Compute canary version
+        id: canary
+        run: |
+          BASE_VERSION=$(node -p "require('./package.json').version")
+          RUN_NO=${GITHUB_RUN_NUMBER:-0}
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          CANARY_VERSION="${BASE_VERSION}-canary.${RUN_NO}.${SHORT_SHA}"
+          npm pkg set version="${CANARY_VERSION}"
+          echo "version=${CANARY_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish canary to npm
+        run: pnpm publish --tag canary --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

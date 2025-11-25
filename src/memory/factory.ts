@@ -24,7 +24,22 @@ export function createMemoryStore(config: MemoryConfig): MemoryStore {
 
 function loadSqliteStore(filePath: string): MemoryStore {
   const require = createRequire(import.meta.url);
-  // Dynamic import keeps better-sqlite3 optional until the sqlite backend is actually enabled.
-  const module = require('./sqlite-store') as typeof import('./sqlite-store');
-  return new module.SqliteMemoryStore(filePath);
+  try {
+    // Dynamic import keeps better-sqlite3 optional until the sqlite backend is actually enabled.
+    const module = require('./sqlite-store') as typeof import('./sqlite-store');
+    return new module.SqliteMemoryStore(filePath);
+  } catch (error) {
+    if (isMissingBetterSqlite(error)) {
+      throw new Error(
+        'SQLite memory backend requires the optional better-sqlite3 dependency. Install it or switch MEMORY_STORE to file or memory.',
+      );
+    }
+    throw error;
+  }
+}
+
+function isMissingBetterSqlite(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const code = (error as NodeJS.ErrnoException).code;
+  return code === 'MODULE_NOT_FOUND' && /better-sqlite3/.test(error.message ?? '');
 }

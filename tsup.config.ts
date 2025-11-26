@@ -1,24 +1,47 @@
 import { defineConfig } from 'tsup';
 
+const shared = {
+  bundle: true,
+  splitting: false,
+  treeshake: true,
+  minify: true,
+  platform: 'node',
+  format: ['cjs'],
+  target: 'node18',
+  sourcemap: false,
+  outExtension() {
+    return { js: '.cjs' };
+  },
+  noExternal: [
+    '@hashgraphonline/standards-sdk',
+    '@hono/node-server',
+    '@modelcontextprotocol/sdk',
+    'bottleneck',
+    'dotenv',
+    'fastmcp',
+    'hono',
+    'ioredis',
+    'pino',
+    'undici',
+    'zod',
+  ],
+  external: ['better-sqlite3', 'effect', 'sury', '@valibot/to-json-schema'],
+} as const;
+
 export default defineConfig([
   {
+    ...shared,
     entry: ['src/index.ts'],
     outDir: 'dist',
-    format: ['esm'],
     dts: true,
-    sourcemap: true,
     clean: true,
-    target: 'es2022',
   },
   {
+    ...shared,
     entry: { up: 'src/cli/up.ts' },
     outDir: 'dist/cli',
-    format: ['esm'],
     dts: false,
-    sourcemap: true,
     banner: { js: '#!/usr/bin/env node' },
-    splitting: false,
     clean: false,
-    target: 'es2022',
   },
 ]);

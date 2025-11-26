@@ -1,32 +1,27 @@
 {
   "name": "@hol-org/hashnet-mcp",
-  "version": "1.0.20",
+  "version": "1.0.21",
   "description": "HOL MCP server for agentic search, discovery, registration, chat, and more with the Hashgraph Online Registry Broker.",
   "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.cjs",
+  "types": "./dist/index.d.cts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
+      "types": "./dist/index.d.cts",
+      "import": "./dist/index.cjs",
+      "default": "./dist/index.cjs"
     },
     "./cli/up": {
-      "import": "./dist/cli/up.js",
-      "default": "./dist/cli/up.js"
+      "import": "./dist/cli/up.cjs",
+      "default": "./dist/cli/up.cjs"
     }
   },
   "bin": {
-    "hashnet-mcp": "./dist/cli/up.js"
+    "hashnet-mcp": "./dist/cli/up.cjs"
   },
   "files": [
-    "dist",
-    "deploy",
-    "examples",
-    "README.md",
-    "AGENTS.md",
-    "todo.md"
+    "dist"
   ],
   "scripts": {
     "dev:stdio": "MCP_TRANSPORT=stdio tsx src/index.ts",
@@ -80,28 +75,32 @@
   },
   "packageManager": "pnpm@10.10.0",
   "devDependencies": {
-    "@types/node": "^24.10.0",
-    "@vitest/coverage-v8": "^2.1.4",
-    "tsup": "^8.5.0",
-    "tsx": "^4.20.6",
-    "typescript": "^5.9.3",
-    "vitest": "^2.1.4"
-  },
-  "dependencies": {
     "@hashgraphonline/standards-sdk": "^0.1.139",
     "@hono/node-server": "^1.19.6",
     "@modelcontextprotocol/sdk": "^1.21.1",
+    "@types/node": "^24.10.0",
+    "@vitest/coverage-v8": "^2.1.4",
     "bottleneck": "^2.19.5",
     "dotenv": "^17.2.3",
     "fastmcp": "^3.22.0",
     "hono": "^4.10.5",
     "ioredis": "^5.8.2",
     "pino": "^10.1.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
     "undici": "^7.16.0",
+    "vitest": "^2.1.4",
     "zod": "^4.1.12"
   },
-  "optionalDependencies": {
+  "dependencies": {},
+  "peerDependencies": {
     "better-sqlite3": "^11.5.0"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3": {
+      "optional": true
+    }
   },
   "overrides": {
     "@hashgraphonline/standards-sdk": "^0.1.139"

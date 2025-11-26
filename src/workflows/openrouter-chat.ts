@@ -27,6 +27,16 @@ const openRouterChatDefinition: PipelineDefinition<OpenRouterChatInput, OpenRout
   createContext: (input) => ({ memoryOptOut: input.disableMemory }),
   steps: [
     {
+      name: 'workflow.openrouterChat.auth.required',
+      run: async ({ input }) => {
+        const registry = input.registry ?? 'openrouter';
+        if (registry === 'openrouter' && !input.authToken) {
+          throw new Error('authToken (OpenRouter API key) is required when using the openrouter registry.');
+        }
+        return { registry };
+      },
+    },
+    {
       name: 'workflow.openrouterChat.memory.load',
       skip: ({ input }) => Boolean(input.disableMemory),
       run: async ({ input, context }) => {

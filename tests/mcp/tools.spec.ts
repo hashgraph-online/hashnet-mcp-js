@@ -45,6 +45,7 @@ const getCreditBalanceMock = vi.fn().mockResolvedValue({
   balance: 500,
   timestamp: new Date().toISOString(),
 });
+const recordEntryMock = vi.fn();
 const withBrokerMock = vi.fn((fn: (client: typeof fakeClient) => Promise<unknown>) => fn(fakeClient));
 
 const loggerSpy = {
@@ -58,6 +59,13 @@ vi.mock('../../src/broker', () => ({
   broker: fakeClient,
   brokerLimiter: undefined,
   getCreditBalance: getCreditBalanceMock,
+}));
+
+vi.mock('../../src/memory', () => ({
+  memoryService: {
+    isEnabled: () => true,
+    recordEntry: recordEntryMock,
+  },
 }));
 
 vi.mock('../../src/logger', () => ({
@@ -178,6 +186,7 @@ describe('mcp tool definitions', () => {
     fakeClient.purchaseCreditsWithHbar.mockClear();
     fakeClient.getX402Minimums.mockClear();
     fakeClient.buyCreditsWithX402.mockClear();
+    recordEntryMock.mockClear();
   });
 
   it('registers all expected tool names', () => {
@@ -197,6 +206,10 @@ describe('mcp tool definitions', () => {
       'hol.chat.history',
       'hol.chat.compact',
       'hol.chat.end',
+      'hol.chat.ensureEncryptionKey',
+      'hol.chat.startEncryptedConversation',
+      'hol.chat.acceptEncryptedConversation',
+      'hol.chat.sendEncrypted',
       'hol.stats',
       'hol.metricsSummary',
       'hol.dashboardStats',
@@ -214,6 +227,7 @@ describe('mcp tool definitions', () => {
       'workflow.discovery',
       'workflow.registerMcp',
       'workflow.chatSmoke',
+      'workflow.encryptedChat',
       'workflow.opsCheck',
       'workflow.openrouterChat',
       'workflow.registryBrokerShowcase',
@@ -284,6 +298,29 @@ describe('mcp tool definitions', () => {
     const endTool = getTool('hol.chat.end');
     await endTool.handler({ sessionId: 's' });
     expect(fakeClient.chat.endSession).toHaveBeenCalledWith('s');
+  });
+
+  it('auto-creates chat sessions when only UAID is provided and records memory entries', async () => {
+    const tool = getTool('hol.chat.sendMessage');
+    const result = await tool.handler({ uaid: 'uaid:auto', message: 'hello auto' });
+    expect(fakeClient.chat.createSession).toHaveBeenCalledWith({ uaid: 'uaid:auto', auth: undefined });
+    expect(fakeClient.chat.sendMessage).toHaveBeenCalledWith({ sessionId: 'session-1', message: 'hello auto', auth: undefined, streaming: undefined });
+    expect(recordEntryMock).toHaveBeenCalledTimes(2);
+    expect(recordEntryMock.mock.calls[0][0]).toMatchObject({
+      scope: { sessionId: 'session-1', uaid: 'uaid:auto' },
+      role: 'user',
+    });
+    expect(recordEntryMock.mock.calls[1][0]).toMatchObject({
+      scope: { sessionId: 'session-1', uaid: 'uaid:auto' },
+      role: 'assistant',
+    });
+    expect(result).toEqual({ message: 'ok' });
+  });
+
+  it('defaults preserveEntries to 4 when compacting history', async () => {
+    const compactTool = getTool('hol.chat.compact');
+    await compactTool.handler({ sessionId: 's1' });
+    expect(fakeClient.chat.compactHistory).toHaveBeenCalledWith({ sessionId: 's1', preserveEntries: 4 });
   });
 
   it('exposes read-only protocol and stats utilities', async () => {

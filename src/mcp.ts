@@ -1,9 +1,20 @@
 import { randomUUID } from 'node:crypto';
-import { AgentAuthConfig, LedgerChallengeRequest, LedgerVerifyRequest, RegistryBrokerClient, RegistryBrokerError } from '@hashgraphonline/standards-sdk';
+import {
+  type AcceptConversationOptions,
+  AgentAuthConfig,
+  type ConversationEncryptionOptions,
+  type EncryptedChatSendOptions,
+  type EnsureAgentKeyOptions,
+  type LedgerChallengeRequest,
+  type LedgerVerifyRequest,
+  RegistryBrokerClient,
+  RegistryBrokerError,
+  type StartConversationOptions,
+} from '@hashgraphonline/standards-sdk';
 import { FastMCP } from 'fastmcp';
 import type { Context, Content } from 'fastmcp';
 import { z } from 'zod';
-import { getCreditBalance, withBroker } from './broker';
+import { cacheConversationHandle, getCachedConversationHandle, getCreditBalance, withBroker, withEncryptedBroker } from './broker';
 import { config } from './config';
 import { logger } from './logger';
 import { agentRegistrationSchema } from './schemas/agent';
@@ -18,6 +29,7 @@ import { agentverseBridgeWorkflow } from './workflows/agentverse-bridge';
 import { erc8004DiscoveryWorkflow } from './workflows/erc8004-discovery';
 import { erc8004X402Workflow } from './workflows/erc8004-x402';
 import { x402RegistrationWorkflow } from './workflows/x402-registration';
+import { encryptedChatWorkflow } from './workflows/encrypted-chat';
 import type { PipelineRunResult } from './workflows/types';
 import { memoryService } from './memory';
 import type { MemoryScope } from './memory';
@@ -30,6 +42,9 @@ type UpdateAgentPayload = Parameters<RegistryBrokerClient['updateAgent']>[1];
 type RegistrySearchNamespaceArgs = Parameters<RegistryBrokerClient['registrySearchByNamespace']>;
 type PurchaseHbarPayload = Parameters<RegistryBrokerClient['purchaseCreditsWithHbar']>[0];
 type BuyX402Payload = Parameters<RegistryBrokerClient['buyCreditsWithX402']>[0];
+type StartConversationPayload = StartConversationOptions & { ensureEncryptionKey?: boolean | EnsureAgentKeyOptions };
+type AcceptConversationPayload = AcceptConversationOptions & { ensureEncryptionKey?: boolean | EnsureAgentKeyOptions };
+type EncryptedSendPayload = EncryptedChatSendOptions & { decryptHistory?: boolean; ensureEncryptionKey?: boolean | EnsureAgentKeyOptions };
 
 const connectionInstructions = [
   'You expose the Hashgraph Online Registry Broker via hol.* primitives and workflow.* pipelines. Prefer workflow.* when possible—they bundle common steps and return a pipeline summary plus full results.',
@@ -82,6 +97,56 @@ const chatCompactSchema: z.ZodType<ChatCompactPayload> = z.object({
   auth: agentAuthSchema.optional(),
 }) as z.ZodType<ChatCompactPayload>;
 
+const conversationEncryptionSchema: z.ZodType<ConversationEncryptionOptions> = z
+  .object({
+    preference: z.enum(['preferred', 'required', 'disabled']).optional(),
+    handshakeTimeoutMs: z.number().int().positive().optional(),
+    pollIntervalMs: z.number().int().positive().optional(),
+  })
+  .partial() as z.ZodType<ConversationEncryptionOptions>;
+
+const ensureEncryptionKeySchema: z.ZodType<EnsureAgentKeyOptions> = z.object({
+  uaid: z.string().min(1),
+  keyType: z.enum(['secp256k1']).optional(),
+  publicKey: z.string().optional(),
+  privateKey: z.string().optional(),
+  envVar: z.string().optional(),
+  envPath: z.string().optional(),
+  generateIfMissing: z.boolean().optional(),
+  overwriteEnv: z.boolean().optional(),
+  ledgerAccountId: z.string().optional(),
+  ledgerNetwork: z.string().optional(),
+  email: z.string().email().optional(),
+  label: z.string().optional(),
+}) as z.ZodType<EnsureAgentKeyOptions>;
+
+const startConversationSchema = z.object({
+  uaid: z.string().min(1),
+  senderUaid: z.string().min(1),
+  historyTtlSeconds: z.number().int().positive().optional(),
+  auth: agentAuthSchema.optional(),
+  encryption: conversationEncryptionSchema.optional(),
+  ensureEncryptionKey: z.union([z.boolean(), ensureEncryptionKeySchema]).optional(),
+}) as unknown as z.ZodType<StartConversationOptions & { ensureEncryptionKey?: boolean | EnsureAgentKeyOptions }>;
+
+const acceptConversationSchema = z.object({
+  sessionId: z.string().min(1),
+  responderUaid: z.string().min(1),
+  encryption: conversationEncryptionSchema.optional(),
+  ensureEncryptionKey: z.union([z.boolean(), ensureEncryptionKeySchema]).optional(),
+}) as unknown as z.ZodType<AcceptConversationOptions & { ensureEncryptionKey?: boolean | EnsureAgentKeyOptions }>;
+
+const encryptedSendSchema = z.object({
+  sessionId: z.string().min(1),
+  uaid: z.string().min(1),
+  plaintext: z.string().min(1),
+  message: z.string().optional(),
+  streaming: z.boolean().optional(),
+  auth: agentAuthSchema.optional(),
+  decryptHistory: z.boolean().optional(),
+  ensureEncryptionKey: z.union([z.boolean(), ensureEncryptionKeySchema]).optional(),
+}) as unknown as z.ZodType<EncryptedChatSendOptions & { decryptHistory?: boolean; ensureEncryptionKey?: boolean | EnsureAgentKeyOptions }>;
+
 const searchInput = z.object({
   q: z.string().optional(),
   limit: z.number().int().min(1).max(50).default(10),
@@ -128,6 +193,15 @@ const workflowFullInput = z.object({
   registrationPayload: agentRegistrationSchema,
   discoveryQuery: z.string().optional(),
   chatMessage: z.string().optional(),
+  disableMemory: z.boolean().optional(),
+});
+const workflowEncryptedChatInput = z.object({
+  requesterUaid: z.string().min(1),
+  responderUaid: z.string().min(1),
+  requesterAuth: agentAuthSchema.optional(),
+  responderAuth: agentAuthSchema.optional(),
+  requesterMessage: z.string().optional(),
+  responderMessage: z.string().optional(),
   disableMemory: z.boolean().optional(),
 });
 const openRouterChatToolSchema = z.object({
@@ -189,6 +263,10 @@ type RegistryNamespaceInput = z.infer<typeof registryNamespaceInput>;
 type ChatSessionInput = z.infer<typeof chatSessionSchema>;
 type ChatMessageInput = z.infer<typeof chatMessageSchema>;
 type ChatCompactInput = z.infer<typeof chatCompactSchema>;
+type EnsureKeyInput = z.infer<typeof ensureEncryptionKeySchema>;
+type StartConversationInput = z.infer<typeof startConversationSchema>;
+type AcceptConversationInput = z.infer<typeof acceptConversationSchema>;
+type EncryptedSendInput = z.infer<typeof encryptedSendSchema>;
 type CreditBalanceInput = z.infer<typeof creditBalanceInput>;
 type LedgerChallengeInput = z.infer<typeof ledgerChallengeInput>;
 type LedgerVerifyInput = z.infer<typeof ledgerVerifyInput>;
@@ -198,6 +276,13 @@ type BridgePayload = z.infer<typeof bridgePayloadSchema>;
 type Erc8004X402Input = z.infer<typeof erc8004X402ToolSchema>;
 type X402RegistrationInput = z.infer<typeof x402RegistrationToolSchema>;
 type FullWorkflowInput = z.infer<typeof workflowFullInput>;
+type WorkflowEncryptedChatInput = z.infer<typeof workflowEncryptedChatInput>;
+const resolveEnsureOption = (uaid: string, ensure?: boolean | EnsureKeyInput): boolean | EnsureAgentKeyOptions => {
+  if (ensure === undefined) return { uaid, generateIfMissing: true };
+  if (ensure === true) return { uaid, generateIfMissing: true };
+  if (ensure === false) return false;
+  return ensure;
+};
 const memoryScopeSchema = z
   .object({
     uaid: z.string().min(1).optional(),
@@ -457,7 +542,11 @@ const rawToolDefinitions = [
     name: 'hol.chat.compact',
     description: 'Compact chat history while preserving the latest entries.',
     schema: chatCompactSchema,
-    handler: (input: ChatCompactInput) => withBroker((client) => client.chat.compactHistory(input), 'hol.chat.compact'),
+    handler: (input: ChatCompactInput) =>
+      withBroker(
+        (client) => client.chat.compactHistory({ ...input, preserveEntries: input.preserveEntries ?? 4 }),
+        'hol.chat.compact',
+      ),
   },
   {
     name: 'hol.chat.end',
@@ -465,6 +554,100 @@ const rawToolDefinitions = [
     schema: sessionIdInput,
     handler: ({ sessionId }: z.infer<typeof sessionIdInput>) =>
       withBroker((client) => client.chat.endSession(sessionId), 'hol.chat.end'),
+  },
+  {
+    name: 'hol.chat.ensureEncryptionKey',
+    description: 'Ensure an encryption key exists for a UAID (generate if missing).',
+    schema: ensureEncryptionKeySchema,
+    handler: (input: EnsureKeyInput) =>
+      withEncryptedBroker(
+        { uaid: input.uaid, ensureEncryptionKey: input },
+        (client) => client.encryption.ensureAgentKey(input),
+        'hol.chat.ensureEncryptionKey',
+      ),
+  },
+  {
+    name: 'hol.chat.startEncryptedConversation',
+    description: 'Start an encrypted chat conversation with a target UAID.',
+    schema: startConversationSchema,
+    handler: (input: StartConversationInput) =>
+      withEncryptedBroker(
+        { uaid: input.senderUaid, ensureEncryptionKey: resolveEnsureOption(input.senderUaid, input.ensureEncryptionKey), encryption: { autoDecryptHistory: true } },
+        async (client) => {
+          let derivedSessionId: string | undefined;
+          const conversation = await client.chat.startConversation({
+            uaid: input.uaid,
+            senderUaid: input.senderUaid,
+            historyTtlSeconds: input.historyTtlSeconds,
+            auth: input.auth,
+            encryption: input.encryption ?? { preference: 'required' },
+            onSessionCreated: (sessionId) => {
+              derivedSessionId = sessionId;
+            },
+          });
+          const sessionId = derivedSessionId ?? conversation.sessionId;
+          if (sessionId) {
+            cacheConversationHandle(sessionId, input.senderUaid, conversation);
+          }
+          return conversation;
+        },
+        'hol.chat.startEncryptedConversation',
+      ),
+  },
+  {
+    name: 'hol.chat.acceptEncryptedConversation',
+    description: 'Accept an encrypted chat conversation as the responder.',
+    schema: acceptConversationSchema,
+    handler: (input: AcceptConversationInput) =>
+      withEncryptedBroker(
+        { uaid: input.responderUaid, ensureEncryptionKey: resolveEnsureOption(input.responderUaid, input.ensureEncryptionKey), encryption: { autoDecryptHistory: true } },
+        async (client) => {
+          const conversation = await client.chat.acceptConversation({
+            sessionId: input.sessionId,
+            responderUaid: input.responderUaid,
+            encryption: input.encryption ?? { preference: 'required' },
+          });
+          cacheConversationHandle(conversation.sessionId, input.responderUaid, conversation);
+          return conversation;
+        },
+        'hol.chat.acceptEncryptedConversation',
+      ),
+  },
+  {
+    name: 'hol.chat.sendEncrypted',
+    description: 'Send an encrypted message in an existing conversation and optionally fetch decrypted history.',
+    schema: encryptedSendSchema,
+    handler: (input: EncryptedSendInput) =>
+      withEncryptedBroker(
+        {
+          uaid: input.uaid,
+          ensureEncryptionKey: resolveEnsureOption(input.uaid, input.ensureEncryptionKey),
+          encryption: input.decryptHistory === false ? undefined : { autoDecryptHistory: true },
+        },
+        async (client) => {
+          const cached = getCachedConversationHandle(input.sessionId, input.uaid);
+          const conversation =
+            cached ??
+            (await client.chat.acceptConversation({
+              sessionId: input.sessionId,
+              responderUaid: input.uaid,
+              encryption: { preference: 'required' },
+            }));
+          cacheConversationHandle(input.sessionId, input.uaid, conversation);
+          const response = await conversation.send({
+            plaintext: input.plaintext,
+            message: input.message,
+            streaming: input.streaming,
+            auth: input.auth,
+          });
+          if (input.decryptHistory === false) {
+            return response;
+          }
+          const history = await client.chat.getHistory(input.sessionId, { decrypt: true });
+          return { response, history };
+        },
+        'hol.chat.sendEncrypted',
+      ),
   },
   {
     name: 'hol.stats',
@@ -602,6 +785,12 @@ const rawToolDefinitions = [
     schema: workflowChatInput,
     handler: async (input: z.infer<typeof workflowChatInput>) =>
       formatPipelineResult(await chatPipeline.run(input)),
+  },
+  {
+    name: 'workflow.encryptedChat',
+    description: 'Pipeline: encrypted chat handshake + bidirectional message exchange between two UAIDs.',
+    schema: workflowEncryptedChatInput,
+    handler: async (input: WorkflowEncryptedChatInput) => formatPipelineResult(await encryptedChatWorkflow.run(input)),
   },
   {
     name: 'workflow.opsCheck',

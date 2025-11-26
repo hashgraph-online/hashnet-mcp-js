@@ -40,6 +40,7 @@
     "test:coverage": "vitest run --coverage",
     "test:tools": "tsx scripts/run-tool-suite.ts --spawn",
     "test:tools:mock": "tsx scripts/run-tool-suite.ts --mock",
+    "chat:smoke": "tsx scripts/chat-smoke.ts",
     "workflow:list": "tsx scripts/list-workflows.ts",
     "workflow:run": "tsx scripts/run-workflow.ts",
     "workflow:register": "tsx scripts/workflow-register.ts",

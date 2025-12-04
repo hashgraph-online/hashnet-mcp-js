@@ -1,4 +1,12 @@
-import { RegistryBrokerClient, RegistryBrokerError } from '@hashgraphonline/standards-sdk';
+import {
+  type ChatConversationHandle,
+  type ClientEncryptionOptions,
+  type EnsureAgentKeyOptions,
+  type InitializeAgentClientOptions,
+  type RegistryBrokerClientOptions,
+  RegistryBrokerClient,
+  RegistryBrokerError,
+} from '@hashgraphonline/standards-sdk';
 import Bottleneck from 'bottleneck';
 import IORedis from 'ioredis';
 import { fetch as undiciFetch } from 'undici';
@@ -83,6 +91,82 @@ export interface CreditBalanceResponse {
   accountId: string;
   balance: number;
   timestamp: string;
+}
+
+type EncryptionClientOptions = {
+  uaid: string;
+  ensureEncryptionKey?: boolean | EnsureAgentKeyOptions;
+  encryption?: ClientEncryptionOptions;
+};
+
+const encryptionClientCache = new Map<string, Promise<RegistryBrokerClient>>();
+const conversationHandleCache = new Map<string, ChatConversationHandle>();
+
+const buildEncryptionClientKey = (options: EncryptionClientOptions): string => {
+  const autoDecrypt = options.encryption?.autoDecryptHistory ? 'decrypt' : 'nodecrypt';
+  const ensureLabel =
+    typeof options.ensureEncryptionKey === 'object' ? options.ensureEncryptionKey.label ?? '' : options.ensureEncryptionKey ? 'ensure' : 'skip';
+  return `${options.uaid}:${autoDecrypt}:${ensureLabel}`;
+};
+
+const resolveEncryptionInitOptions = (options: EncryptionClientOptions): InitializeAgentClientOptions => {
+  const ensureEncryptionKey =
+    options.ensureEncryptionKey === undefined
+      ? { uaid: options.uaid, generateIfMissing: true }
+      : options.ensureEncryptionKey;
+  const encryption: ClientEncryptionOptions =
+    options.encryption ??
+    {
+      autoDecryptHistory: true,
+    };
+  const base: RegistryBrokerClientOptions = {
+    baseUrl: normalizeRegistryUrl(config.registryBrokerUrl),
+    apiKey: config.registryBrokerApiKey,
+    fetchImplementation: undiciFetch as unknown as typeof fetch,
+    encryption,
+  };
+  return { ...base, uaid: options.uaid, ensureEncryptionKey };
+};
+
+async function getEncryptedClient(options: EncryptionClientOptions): Promise<RegistryBrokerClient> {
+  if (!config.registryBrokerApiKey) {
+    throw new Error('REGISTRY_BROKER_API_KEY is required to use encrypted chat helpers.');
+  }
+  const key = buildEncryptionClientKey(options);
+  const cached = encryptionClientCache.get(key);
+  if (cached) return cached;
+  const clientPromise = RegistryBrokerClient.initializeAgent(resolveEncryptionInitOptions(options)).then((result) => result.client);
+  encryptionClientCache.set(key, clientPromise);
+  return clientPromise;
+}
+
+export async function withEncryptedBroker<T>(
+  options: EncryptionClientOptions,
+  task: BrokerTask<T>,
+  label?: string,
+): Promise<T> {
+  const run = async () => {
+    try {
+      const client = await getEncryptedClient(options);
+      return await task(client);
+    } catch (error) {
+      throw formatBrokerError(error, label);
+    }
+  };
+  if (brokerLimiter) {
+    return brokerLimiter.schedule(run);
+  }
+  return run();
+}
+
+const conversationKey = (sessionId: string, uaid: string) => `${sessionId}:${uaid}`;
+
+export function cacheConversationHandle(sessionId: string, uaid: string, handle: ChatConversationHandle): void {
+  conversationHandleCache.set(conversationKey(sessionId, uaid), handle);
+}
+
+export function getCachedConversationHandle(sessionId: string, uaid: string): ChatConversationHandle | undefined {
+  return conversationHandleCache.get(conversationKey(sessionId, uaid));
 }
 
 export async function getCreditBalance(accountId?: string): Promise<CreditBalanceResponse> {

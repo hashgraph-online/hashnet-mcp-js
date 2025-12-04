@@ -1,0 +1,220 @@
+{
+  "entries": [
+    {
+      "scope": {
+        "sessionId": "uaid:aid:2ZveEf2d8Jig13LgihnU3arirxxfbaArA4aCuVrctsY8aZ8u1D6JGcfNejkFd5a6Pu;uid=mcp-pulsemcp-statsource-analytics;registry=pulsemcp;proto=mcp;nativeId=https://www.pulsemcp.com/servers/statsource-analytics"
+      },
+      "role": "user",
+      "content": "Hi StatSource Analytics! Can you confirm you are online for a quick connectivity test?",
+      "toolName": "hol.chat.sendMessage",
+      "expiresAt": 1764136196494,
+      "id": "a3f126a5-64c1-4fed-b201-cd7e09065048",
+      "createdAt": 1764049796494
+    },
+    {
+      "scope": {
+        "namespace": "hashnet-demo"
+      },
+      "role": "note",
+      "content": "chat send to StatSource Analytics failed: hol.chat.sendMessage returned 500 Agent not found (registry pulsemcp).",
+      "expiresAt": 1764136205322,
+      "id": "df7a8808-4359-447f-b4fe-f522bccd24a5",
+      "createdAt": 1764049805322
+    },
+    {
+      "scope": {
+        "sessionId": "uaid:aid:8FabcLHFuAku7TAAWQ7uPCXpSgVGErbybyjR6T9kJKB2EAFevihChbVq2PpPhBMucM;uid=agent1qv6c5ppgwl26439gvh7ml8k0axvxlvf7jsw6t84llef28c68256w7lsd9z3;registry=agentverse;proto=agentverse;nativeId=agent1qv6c5ppgwl26439gvh7ml8k0axvxlvf7jsw6t84llef28c68256w7lsd9z3"
+      },
+      "role": "user",
+      "content": "Hello BTC tracker! Can you share the latest BTC/USD price reading you have?",
+      "toolName": "hol.chat.sendMessage",
+      "expiresAt": 1764136235440,
+      "id": "26f3ca94-ff73-45fb-8897-b447c27c070d",
+      "createdAt": 1764049835440
+    },
+    {
+      "scope": {
+        "namespace": "hashnet-demo"
+      },
+      "role": "note",
+      "content": "chat send to BTC Price Tracker agent failed: AgentVerse almanac entry missing (500 error). Need alternate agent.",
+      "expiresAt": 1764136244952,
+      "id": "00f676de-708b-435a-901f-c97fafd3d936",
+      "createdAt": 1764049844952
+    },
+    {
+      "scope": {
+        "sessionId": "uaid:aid:5Ej5HLtggDqusyukC4WrT23cFMLiM8artgaPh3g6RLnq1VCgDbhpJr3ssx6z4Eai6Y;uid=agent1qw5ngne0vwvga32rn8vkum6jsgdl5rgfycp8er02n6hry8x6tc2tkqre7ag;registry=agentverse;proto=agentverse;nativeId=agent1qw5ngne0vwvga32rn8vkum6jsgdl5rgfycp8er02n6hry8x6tc2tkqre7ag"
+      },
+      "role": "user",
+      "content": "Hey Echo! Running a connectivity test—could you briefly describe one coding scenario you help with?",
+      "toolName": "hol.chat.sendMessage",
+      "expiresAt": 1764136282508,
+      "id": "b724d73d-8018-42c2-b381-4239859510c5",
+      "createdAt": 1764049882508
+    },
+    {
+      "scope": {
+        "namespace": "hashnet-demo"
+      },
+      "role": "note",
+      "content": "chat send to Echo coding assistant failed: AgentVerse proxy returned HTTP 422.",
+      "expiresAt": 1764136292087,
+      "id": "26cb0205-d5c7-4b76-954c-053e2b455b59",
+      "createdAt": 1764049892087
+    },
+    {
+      "scope": {
+        "sessionId": "uaid:aid:3ctJsnUSEFmXkq2ZJ2MfQzcpo1RptGkVa6yEqnein95Qfk5bsqMhduQAZuBzdo4mm2;uid=agent1qfkz2s652pkn3gz4rvc3c46vwfukhqm97s9z5qjhj6arsvgg7rkyvywvtta;registry=agentverse;proto=agentverse;nativeId=agent1qfkz2s652pkn3gz4rvc3c46vwfukhqm97s9z5qjhj6arsvgg7rkyvywvtta"
+      },
+      "role": "user",
+      "content": "Hi EV Echo! Could you confirm you're online by letting me know which API you use to find chargers?",
+      "toolName": "hol.chat.sendMessage",
+      "expiresAt": 1764136316123,
+      "id": "27d9db3b-bd3b-4f0d-b122-6eada9ae19dd",
+      "createdAt": 1764049916123
+    },
+    {
+      "scope": {
+        "sessionId": "uaid:aid:4v6SSTzm5SRswCU8veN3BubwNtEw6ESYFuKMGP7GXjrXmAxGNq9kpF1afQZjRo8g4u;uid=agent1qv7lnjxjf7l9pgjfvwe0e5qux7v8j3y924t6er2c0gnjfuvqykgj6tlvulz;registry=agentverse;proto=agentverse;nativeId=agent1qv7lnjxjf7l9pgjfvwe0e5qux7v8j3y924t6er2c0gnjfuvqykgj6tlvulz"
+      },
+      "role": "user",
+      "content": "Hi Study Helper! I'm testing connectivity—can you share one tip for memorizing biology terms?",
+      "toolName": "hol.chat.sendMessage",
+      "expiresAt": 1764136351542,
+      "id": "1dca78ee-86ce-4fd4-8543-eed49bcad6d3",
+      "createdAt": 1764049951542
+    },
+    {
+      "scope": {
+        "sessionId": "uaid:aid:32SuQR3UVV2qaH6PDrdfJma6Nqdhytdy7eNC3ZMKJNdmQBARWu7spUDfeZPmi4WQUm;uid=agent1qg869zt362lj4e60n5z6mvkmjmztnd2vu6k8ud3ee4fl4rrwea7ucqvhrqh;registry=agentverse;proto=agentverse;nativeId=agent1qg869zt362lj4e60n5z6mvkmjmztnd2vu6k8ud3ee4fl4rrwea7ucqvhrqh"
+      },
+      "role": "user",
+      "content": "Hello aliceagent12345! Please echo back this message to confirm you're reachable.",
+      "toolName": "hol.chat.sendMessage",
+      "expiresAt": 1764136391492,
+      "id": "e4fdb2f6-bae9-4743-809c-e3ef3797cdf8",
+      "createdAt": 1764049991492
+    },
+    {
+      "scope": {
+        "sessionId": "uaid:aid:2AySrEM1EUrubWTdiasQKGJ5qfEKCevZZFrdpdHcm7gbRDK2wQ1R4Sa52gqAYiKbm7;uid=hashnet-mcp;registry=hashgraph-online;proto=sse;nativeId=hashnet.example.com"
+      },
+      "role": "user",
+      "content": "Hello Hashnet MCP Server! Just confirming chat connectivity from the Cursor test harness.",
+      "toolName": "hol.chat.sendMessage",
+      "expiresAt": 1764136426790,
+      "id": "02f776a1-e8e2-46d3-90ea-2ff122e54624",
+      "createdAt": 1764050026790
+    },
+    {
+      "scope": {
+        "sessionId": "uaid:aid:3HCjx8gbfdWUzYUyziy5PETuFDBsrXaV2yt2jLdsrWJEJgpqy4vxWjut7bbRWqRyta;uid=agent1qvwpasnrjk2szw36774t7htmgnvmcrly5vrr90shpnhqtnxpl664shy3qn2;registry=agentverse;proto=agentverse;nativeId=agent1qvwpasnrjk2szw36774t7htmgnvmcrly5vrr90shpnhqtnxpl664shy3qn2"
+      },
+      "role": "user",
+      "content": "Hello AgentVerse Proxy! Can you acknowledge this ping from the Hashnet MCP test client?",
+      "toolName": "hol.chat.sendMessage",
+      "expiresAt": 1764136473193,
+      "id": "2466d609-bd0c-4f42-b43b-721a9941f45f",
+      "createdAt": 1764050073193
+    },
+    {
+      "scope": {
+        "sessionId": "uaid:aid:4v6SSTzm5SRswCU8veN3BubwNtEw6ESYFuKMGP7GXjrXmAxGNq9kpF1afQZjRo8g4u;uid=agent1qv7lnjxjf7l9pgjfvwe0e5qux7v8j3y924t6er2c0gnjfuvqykgj6tlvulz;registry=agentverse;proto=agentverse;nativeId=agent1qv7lnjxjf7l9pgjfvwe0e5qux7v8j3y924t6er2c0gnjfuvqykgj6tlvulz"
+      },
+      "role": "user",
+      "content": "Testing with protocol parameter",
+      "toolName": "hol.chat.sendMessage",
+      "expiresAt": 1764136548273,
+      "id": "751c4851-f800-4c2a-b7ff-b0c42343b5c0",
+      "createdAt": 1764050148273
+    },
+    {
+      "scope": {
+        "uaid": "uaid:aid:4v6SSTzm5SRswCU8veN3BubwNtEw6ESYFuKMGP7GXjrXmAxGNq9kpF1afQZjRo8g4u;uid=agent1qv7lnjxjf7l9pgjfvwe0e5qux7v8j3y924t6er2c0gnjfuvqykgj6tlvulz;registry=agentverse;proto=agentverse;nativeId=agent1qv7lnjxjf7l9pgjfvwe0e5qux7v8j3y924t6er2c0gnjfuvqykgj6tlvulz",
+        "sessionId": "uaid:aid:4v6SSTzm5SRswCU8veN3BubwNtEw6ESYFuKMGP7GXjrXmAxGNq9kpF1afQZjRo8g4u;uid=agent1qv7lnjxjf7l9pgjfvwe0e5qux7v8j3y924t6er2c0gnjfuvqykgj6tlvulz;registry=agentverse;proto=agentverse;nativeId=agent1qv7lnjxjf7l9pgjfvwe0e5qux7v8j3y924t6er2c0gnjfuvqykgj6tlvulz"
+      },
+      "role": "user",
+      "content": "Quick smoke test from Hashnet MCP. Please respond with a study tip.",
+      "toolName": "workflow.chatSmoke",
+      "expiresAt": 1764136561219,
+      "id": "7345243c-176f-4e79-b3f5-eb15a25aa21c",
+      "createdAt": 1764050161219
+    },
+    {
+      "scope": {
+        "sessionId": "uaid:aid:43R7NoFXSHA3tYfDYJzmKt2chR8Jgv5H6MsrQQhCmpDUx96nqsqXwVBSMhbeG8EU9x;uid=e4884c73fb77ec74034e3d961ea6e94a79e0b21b72605c5f665e809342fe50a4;registry=coinbase-x402-bazaar;proto=x402;nativeId=https://ai-api-sbx.aeon.xyz/open/ai/402/payment"
+      },
+      "role": "user",
+      "content": "Ping from Hashnet MCP client—can you acknowledge this without creating a payment?",
+      "toolName": "hol.chat.sendMessage",
+      "expiresAt": 1764136620935,
+      "id": "4c989cff-bcc9-4fea-a2c0-8798d12e5259",
+      "createdAt": 1764050220935
+    },
+    {
+      "scope": {
+        "namespace": "hashnet-demo"
+      },
+      "role": "note",
+      "content": "Multiple chat attempts (StatSource Analytics, BTC Price Tracker, Echo coding assistant, EV Echo, Study Helper, AgentVerse Proxy, Agentverse marketing assistants, x402 fiat QR agent) all failed due to missing adapters, 422s, or auth requirements. No accessible agent responded to chat as of 2025-11-24.",
+      "expiresAt": 1764136639260,
+      "id": "a99ca97d-b7ec-4886-8355-f0929a26e64d",
+      "createdAt": 1764050239260
+    },
+    {
+      "scope": {
+        "namespace": "hashnet-demo"
+      },
+      "role": "note",
+      "content": "Encrypted chat attempt using hol.chat.startEncryptedConversation with Study Helper UAID failed: 404 Encrypted session not found (likely missing local UAID/auth context).",
+      "expiresAt": 1764136673015,
+      "id": "d12ec9ba-93b2-44a7-af62-09688deb0f74",
+      "createdAt": 1764050273015
+    },
+    {
+      "scope": {
+        "sessionId": "uaid:aid:41As7dsjdTP1auEGU4sTwU7SMF4F7osfpLMt7FdY2qnhRqS5d9KWwC4UAvWZY2MnyV;uid=registry-ping-agent;registry=a2a-registry;proto=a2a-registry;nativeId=registry-ping-agent"
+      },
+      "role": "user",
+      "content": "Hello Registry Ping Agent! Please reply if you can hear this connectivity test.",
+      "toolName": "hol.chat.sendMessage",
+      "expiresAt": 1764185784914,
+      "id": "3c793f6b-4f39-43df-8de8-62dc7246d606",
+      "createdAt": 1764099384914
+    },
+    {
+      "scope": {
+        "sessionId": "uaid:aid:41As7dsjdTP1auEGU4sTwU7SMF4F7osfpLMt7FdY2qnhRqS5d9KWwC4UAvWZY2MnyV;uid=registry-ping-agent;registry=a2a-registry;proto=a2a-registry;nativeId=registry-ping-agent"
+      },
+      "role": "assistant",
+      "content": "{\"sessionId\":\"uaid:aid:41As7dsjdTP1auEGU4sTwU7SMF4F7osfpLMt7FdY2qnhRqS5d9KWwC4UAvWZY2MnyV;uid=registry-ping-agent;registry=a2a-registry;proto=a2a-registry;nativeId=registry-ping-agent\",\"uaid\":\"uaid:aid:41As7dsjdTP1auEGU4sTwU7SMF4F7osfpLMt7FdY2qnhRqS5d9KWwC4UAvWZY2MnyV;uid=registry-ping-agent;registry=a2a-registry;proto=a2a-registry;nativeId=registry-ping-agent\",\"message\":\"{\\\"kind\\\":\\\"message\\\",\\\"messageId\\\":\\\"f881383f-19c9-4f79-a855-f8212d51e1bc\\\",\\\"role\\\":\\\"agent\\\",\\\"parts\\\":[{\\\"kind\\\":\\\"text\\\",\\\"text\\\":\\\"PONG: Received \\\\\\\"Hello Registry Ping Agent! Please reply if you can hear this connectivity test.\\\\\\\"\\\"}],\\\"metadata\\\":{\\\"agentAlias\\\":\\\"registry-ping-agent\\\",\\\"echo\\\":\\\"Hello Registry Ping Agent! Please reply if you can hear this connectivity test.\\\",\\\"latencyMs\\\":0}}\",\"timestamp\":\"2025-11-25T19:36:25.246Z\",\"rawResponse\":{\"kind\":\"message\",\"messageId\":\"f881383f-19c9-4f79-a855-f8212d51e1bc\",\"role\":\"agent\",\"parts\":[{\"kind\":\"text\",\"text\":\"PONG: Received \\\"Hello Registry Ping Agent! Please reply if you can hear this connectivity test.\\\"\"}],\"metadata\":{\"agentAlias\":\"registry-ping-agent\",\"echo\":\"Hello Registry Ping Agent! Please reply if you can hear this connectivity test.\",\"latencyMs\":0}},\"history\":[{\"messageId\":\"c0aa3425-db24-4644-ab50-db547e2a0990\",\"role\":\"user\",\"content\":\"PING\",\"timestamp\":\"2025-11-25T19:13:36.016Z\"},{\"messageId\":\"4d9bb48d-0547-42c0-ac15-dd4e4c7a10d7\",\"role\":\"agent\",\"content\":\"{\\\"kind\\\":\\\"message\\\",\\\"messageId\\\":\\\"8f2eb5cc-363f-4e47-ab09-fdc7ccb2df9a\\\",\\\"role\\\":\\\"agent\\\",\\\"parts\\\":[{\\\"kind\\\":\\\"text\\\",\\\"text\\\":\\\"PONG\\\"}],\\\"metadata\\\":{\\\"agentAlias\\\":\\\"registry-ping-agent\\\",\\\"echo\\\":\\\"PING\\\",\\\"latencyMs\\\":3}}\",\"timestamp\":\"2025-11-25T19:13:36.356Z\"},{\"messageId\":\"92365f8b-ba56-46d8-a21f-6742a1b2bd76\",\"role\":\"user\",\"content\":\"PING\",\"timestamp\":\"2025-11-25T19:23:05.915Z\"},{\"messageId\":\"987015c8-1132-43d9-98e9-f93f8d0d7dfc\",\"role\":\"agent\",\"content\":\"{\\\"kind\\\":\\\"message\\\",\\\"messageId\\\":\\\"19c9852d-97d1-4396-a469-6adf25fe5edc\\\",\\\"role\\\":\\\"agent\\\",\\\"parts\\\":[{\\\"kind\\\":\\\"text\\\",\\\"text\\\":\\\"PONG\\\"}],\\\"metadata\\\":{\\\"agentAlias\\\":\\\"registry-ping-agent\\\",\\\"echo\\\":\\\"PING\\\",\\\"latencyMs\\\":1}}\",\"timestamp\":\"2025-11-25T19:23:06.025Z\"},{\"messageId\":\"80e3fe0b-d849-4ed0-84ae-5efe10542427\",\"role\":\"user\",\"content\":\"PING\",\"timestamp\":\"2025-11-25T19:23:23.551Z\"},{\"messageId\":\"548ed1dc-3d1b-4a58-8a43-4754fb0b00d0\",\"role\":\"agent\",\"content\":\"{\\\"kind\\\":\\\"message\\\",\\\"messageId\\\":\\\"fb51bf5e-dc24-4ebd-a3a0-5cba50110762\\\",\\\"role\\\":\\\"agent\\\",\\\"parts\\\":[{\\\"kind\\\":\\\"text\\\",\\\"text\\\":\\\"PONG\\\"}],\\\"metadata\\\":{\\\"agentAlias\\\":\\\"registry-ping-agent\\\",\\\"echo\\\":\\\"PING\\\",\\\"latencyMs\\\":0}}\",\"timestamp\":\"2025-11-25T19:23:23.700Z\"},{\"messageId\":\"a350d92e-bc0b-46a2-a5c9-96097dca8766\",\"role\":\"user\",\"content\":\"PING\",\"timestamp\":\"2025-11-25T19:24:04.692Z\"},{\"messageId\":\"023bb315-d8cf-4441-8d6d-5337a068d4d0\",\"role\":\"agent\",\"content\":\"{\\\"kind\\\":\\\"message\\\",\\\"messageId\\\":\\\"3fbea472-767d-4895-84a2-9426b551ab4e\\\",\\\"role\\\":\\\"agent\\\",\\\"parts\\\":[{\\\"kind\\\":\\\"text\\\",\\\"text\\\":\\\"PONG\\\"}],\\\"metadata\\\":{\\\"agentAlias\\\":\\\"registry-ping-agent\\\",\\\"echo\\\":\\\"PING\\\",\\\"latencyMs\\\":1}}\",\"timestamp\":\"2025-11-25T19:24:04.723Z\"},{\"messageId\":\"367c7dbc-894d-48a2-a3dd-5b86ea3eed08\",\"role\":\"user\",\"content\":\"Hello Registry Ping Agent! Please reply if you can hear this connectivity test.\",\"timestamp\":\"2025-11-25T19:36:25.072Z\"},{\"messageId\":\"548d2d24-872c-4eb8-b1c0-54e03daa6b89\",\"role\":\"agent\",\"content\":\"{\\\"kind\\\":\\\"message\\\",\\\"messageId\\\":\\\"f881383f-19c9-4f79-a855-f8212d51e1bc\\\",\\\"role\\\":\\\"agent\\\",\\\"parts\\\":[{\\\"kind\\\":\\\"text\\\",\\\"text\\\":\\\"PONG: Received \\\\\\\"Hello Registry Ping Agent! Please reply if you can hear this connectivity test.\\\\\\\"\\\"}],\\\"metadata\\\":{\\\"agentAlias\\\":\\\"registry-ping-agent\\\",\\\"echo\\\":\\\"Hello Registry Ping Agent! Please reply if you can hear this connectivity test.\\\",\\\"latencyMs\\\":0}}\",\"timestamp\":\"2025-11-25T19:36:25.191Z\"}],\"historyTtlSeconds\":900}",
+      "toolName": "hol.chat.sendMessage",
+      "expiresAt": 1764185785229,
+      "id": "61041b6d-a90d-429b-9b7d-4b29e3c1a990",
+      "createdAt": 1764099385229
+    },
+    {
+      "scope": {
+        "namespace": "hashnet-demo"
+      },
+      "role": "note",
+      "content": "2025-11-25: Registry Ping Agent UAID responded to plain hol.chat.sendMessage with PONG echo. Multiple attempts to start/send encrypted conversation (ensuring key for 'self', requesting encryption) failed with 'Encryption is not enabled for this session', indicating the agent or adapter doesn't support encrypted chat.",
+      "expiresAt": 1764186067627,
+      "id": "55c57c1e-a4b5-4f88-bf7d-b140f84b90a7",
+      "createdAt": 1764099667627
+    },
+    {
+      "scope": {
+        "sessionId": "49dd57fe-3bd9-4f23-b3f0-aead3bfb0cf4"
+      },
+      "role": "user",
+      "content": "Non-encrypted fallback ping after encrypted attempt.",
+      "toolName": "hol.chat.sendMessage",
+      "expiresAt": 1764196697817,
+      "id": "52193f12-1261-4da9-abc0-fac583f8b157",
+      "createdAt": 1764110297817
+    }
+  ],
+  "summaries": []
+}

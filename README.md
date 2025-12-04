@@ -86,6 +86,7 @@ Use `"type": "sse"` if your build expects it.
 - NPX runner: `npx @hol-org/hashnet-mcp up --transport sse --port 3333`
 - Local TS runner: `pnpm cli:up -- --transport sse`
 - Guided DX: `pnpm quickstart` (env copy → deps → smoke → launch)
+- Manual chat smoke: `pnpm chat:smoke --uaid <uaid> [--auth-token <token>] [--top-up --account-id <id> --private-key <key>]`
 - Workflows: `pnpm workflow:list`, `pnpm workflow:run <name> --payload examples/workflows/<file>.json`
 - Tests: `pnpm test --run --coverage`
 
@@ -93,16 +94,16 @@ Use `"type": "sse"` if your build expects it.
 Categories are exposed as MCP tools (`hol.*`) plus workflows (`workflow.*`):
 - **Discovery**: `hol.search`, `hol.vectorSearch`, `hol.registrySearchByNamespace`, `hol.resolveUaid`
 - **Registration**: `hol.getRegistrationQuote`, `hol.registerAgent`, `hol.waitForRegistrationCompletion`, `hol.updateAgent`
-- **Chat**: `hol.chat.createSession` (uaid or agentUrl), `hol.chat.sendMessage` (sessionId or uaid/agentUrl; auto-creates session), `hol.chat.history`, `hol.chat.compact`, `hol.chat.end`, `hol.closeUaidConnection`
+- **Chat**: `hol.chat.createSession` (uaid or agentUrl), `hol.chat.sendMessage` (sessionId or uaid/agentUrl; auto-creates session), `hol.chat.history`, `hol.chat.compact`, `hol.chat.end`, `hol.closeUaidConnection`; encrypted helpers: `hol.chat.ensureEncryptionKey`, `hol.chat.startEncryptedConversation`, `hol.chat.acceptEncryptedConversation`, `hol.chat.sendEncrypted`
 - **Protocols/Ops**: `hol.listProtocols`, `hol.detectProtocol`, `hol.stats`, `hol.metricsSummary`, `hol.dashboardStats`, `hol.websocketStats`
 - **Credits**: `hol.credits.balance`, `hol.purchaseCredits.hbar`, `hol.x402.minimums`, `hol.x402.buyCredits`
 - **Ledger**: `hol.ledger.challenge`, `hol.ledger.authenticate`
-- **Workflows** (pipelines): discovery, registration, full registration, chat smoke, ops check, ERC-8004 and X402 helpers, OpenRouter chat, registry showcase, Agentverse bridge. See `examples/workflows/` for payloads.
+- **Workflows** (pipelines): discovery, registration, full registration, chat smoke, encrypted chat, ops check, ERC-8004 and X402 helpers, OpenRouter chat, registry showcase, Agentverse bridge. See `examples/workflows/` for payloads.
 
 ## Usage patterns
 - **Discovery**: `workflow.discovery { query?, limit? }` or `hol.search` with filters (`capabilities`, `metadata`, `type=ai-agents|mcp-servers`).
 - **Registration**: `workflow.registerMcp { payload }` (quote → register → wait) or `workflow.fullRegistration` to add discovery/chat/ops.
-- **Chat**: Start with `hol.chat.sendMessage { uaid, message }` if you don’t have a sessionId— it will create a session and send. Otherwise use `hol.chat.createSession` then `hol.chat.sendMessage { sessionId, message }`. Manage with `hol.chat.history/compact/end`.
+- **Chat**: Start with `hol.chat.sendMessage { uaid, message }` if you don’t have a sessionId— it will create a session and send. Otherwise use `hol.chat.createSession` then `hol.chat.sendMessage { sessionId, message }`. Manage with `hol.chat.history/compact/end`. For end-to-end encrypted sessions, run `workflow.encryptedChat` or the `hol.chat.start/accept/sendEncrypted` trio after calling `hol.chat.ensureEncryptionKey`.
 - **Ops/Health**: `workflow.opsCheck` or the `hol.stats`/`hol.metricsSummary`/`hol.dashboardStats` trio.
 - **Credits**: Always check `hol.credits.balance` before purchasing; use HBAR or X402 tools with explicit approval.
 - **Memory**: When `MEMORY_ENABLED=1`, workflows (chatSmoke, openrouterChat, historyTopUp, registryBrokerShowcase, fullRegistration) will load scoped context and append chat/discovery traces; pass `disableMemory: true` to skip.
@@ -133,6 +134,7 @@ Categories are exposed as MCP tools (`hol.*`) plus workflows (`workflow.*`):
 - `hol.chat.createSession` — open a session by `uaid` or `agentUrl`.
 - `hol.chat.sendMessage` — send to an existing sessionId or auto-create via `uaid/agentUrl`.
 - `hol.chat.history` / `hol.chat.compact` / `hol.chat.end` — manage chat lifecycle.
+- Encrypted helpers: `hol.chat.ensureEncryptionKey`, `hol.chat.startEncryptedConversation`, `hol.chat.acceptEncryptedConversation`, `hol.chat.sendEncrypted` (encrypt/decrypt via broker-managed keys).
 
 **Protocols / Ops**
 - `hol.stats`, `hol.metricsSummary`, `hol.dashboardStats`, `hol.websocketStats` — broker health/metrics.
@@ -149,7 +151,7 @@ Categories are exposed as MCP tools (`hol.*`) plus workflows (`workflow.*`):
 **Workflows (pipelines)**
 - Discovery: `workflow.discovery`, `workflow.erc8004Discovery`
 - Registration: `workflow.registerMcp`, `workflow.fullRegistration`, `workflow.erc8004X402`, `workflow.x402Registration`, `workflow.registerAgentErc8004`
-- Chat/Ops: `workflow.chatSmoke`, `workflow.opsCheck`, `workflow.registryBrokerShowcase`, `workflow.openrouterChat`, `workflow.agentverseBridge`
+- Chat/Ops: `workflow.chatSmoke`, `workflow.encryptedChat`, `workflow.opsCheck`, `workflow.registryBrokerShowcase`, `workflow.openrouterChat`, `workflow.agentverseBridge`
 - Utilities: see `examples/workflows/` for payloads and `pnpm workflow:list`
 
 ## Environment
@@ -157,6 +159,7 @@ Set in `.env` or your process:
 - `REGISTRY_BROKER_API_URL` (default `https://registry.hashgraphonline.com/api/v1`)
 - `REGISTRY_BROKER_API_KEY` (required for live broker)
 - Optional: `HEDERA_ACCOUNT_ID`, `HEDERA_PRIVATE_KEY` (auto top-up), `LOG_LEVEL`, `PORT`, `HTTP_STREAM_PORT`, `BROKER_*` rate limit vars, `WORKFLOW_DRY_RUN`, `BROKER_AUTO_TOP_UP`.
+- Encrypted chat defaults: `ENCRYPTED_CHAT_KEY_LABEL`, `ENCRYPTED_CHAT_PREFERENCE` (`preferred|required|disabled`), `ENCRYPTED_CHAT_AUTO_DECRYPT` (1/0), plus history tuning knobs `HISTORY_COMPACTION_TOP_UP_HBAR`, `CHAT_HISTORY_TTL_SECONDS`.
 - Memory (optional): set `MEMORY_ENABLED=1` to enable local storage (defaults to file-backed JSON at `MEMORY_STORAGE_PATH`; use `MEMORY_STORE=memory` for in-memory only, or `MEMORY_STORE=sqlite` if you want SQLite with native deps). Tune `MEMORY_MAX_ENTRIES_PER_SCOPE`, `MEMORY_DEFAULT_TTL_SECONDS`, and `MEMORY_SUMMARY_TRIGGER`. See `help://hol/memory` for the `hol.memory.*` tools.
 
 ## Testing & quality

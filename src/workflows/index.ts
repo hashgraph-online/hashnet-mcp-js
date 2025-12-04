@@ -19,6 +19,7 @@ import './agentverse-bridge';
 import './erc8004-discovery';
 import './erc8004-x402';
 import './x402-registration';
+import './encrypted-chat';
 import './chat';
 import './ops';
 import './combined';

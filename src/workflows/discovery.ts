@@ -18,7 +18,7 @@ const discoveryDefinition: PipelineDefinition<DiscoveryInput, DiscoveryContext> 
   name: 'workflow.discovery',
   description: 'Run hol.search and hol.vectorSearch to explore agents.',
   version: '1.0.0',
-  requiredEnv: ['REGISTRY_BROKER_API_KEY'],
+  requiredEnv: [],
   createContext: () => ({ results: {} }),
   steps: [
     {
@@ -27,7 +27,7 @@ const discoveryDefinition: PipelineDefinition<DiscoveryInput, DiscoveryContext> 
       allowDuringDryRun: true,
       run: async ({ input, context }) => {
         const payload = { q: input.query, limit: input.limit ?? 5 };
-        const response = await withBroker((client) => client.search(payload));
+        const response = await withBroker((client) => client.search(payload), 'workflow.discovery hol.search', { requireApiKey: false });
         context.results.search = response;
         return response;
       },
@@ -40,7 +40,7 @@ const discoveryDefinition: PipelineDefinition<DiscoveryInput, DiscoveryContext> 
         if (!input.query) {
           return undefined;
         }
-        const response = await withBroker((client) => client.vectorSearch({ query: input.query, limit: input.limit ?? 5 }));
+        const response = await withBroker((client) => client.vectorSearch({ query: input.query, limit: input.limit ?? 5 }), 'workflow.discovery hol.vectorSearch', { requireApiKey: false });
         context.results.vector = response;
         return response;
       },

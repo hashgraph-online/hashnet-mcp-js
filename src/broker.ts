@@ -68,10 +68,23 @@ function createLimiter() {
 
 type BrokerTask<T> = (client: RegistryBrokerClient) => Promise<T>;
 
-export async function withBroker<T>(task: BrokerTask<T>, label?: string): Promise<T> {
+export interface WithBrokerOptions {
+  requireApiKey?: boolean;
+}
+
+export async function withBroker<T>(task: BrokerTask<T>, label?: string, options: WithBrokerOptions = {}): Promise<T> {
+  const requireApiKey = options.requireApiKey ?? true;
   const run = async () => {
-    if (!config.registryBrokerApiKey) {
-      throw new Error('REGISTRY_BROKER_API_KEY is required to call the registry broker. Set it in your environment or .env file.');
+    if (requireApiKey && !config.registryBrokerApiKey) {
+      const toolLabel = label ? ` (${label})` : '';
+      throw new Error(
+        [
+          `REGISTRY_BROKER_API_KEY is required for this broker operation${toolLabel}.`,
+          'Set it in your environment or .env file to enable write/chat/credit workflows.',
+          `Current REGISTRY_BROKER_API_URL=${config.registryBrokerUrl}`,
+          'Note: many brokers allow read-only endpoints (search/stats/protocols) without an API key.',
+        ].join(' '),
+      );
     }
     try {
       return await task(broker);
@@ -196,6 +209,53 @@ export async function getCreditBalance(accountId?: string): Promise<CreditBalanc
   return request();
 }
 
+export interface BrokerJsonRequestOptions {
+  method: string;
+  headers?: Record<string, string>;
+  body?: unknown;
+  requireApiKey?: boolean;
+}
+
+export async function requestBrokerJson<T = unknown>(path: string, options: BrokerJsonRequestOptions): Promise<T> {
+  const requireApiKey = options.requireApiKey ?? false;
+  if (requireApiKey && !config.registryBrokerApiKey) {
+    throw new Error('REGISTRY_BROKER_API_KEY is required for this broker operation.');
+  }
+
+  const base = config.registryBrokerUrl.endsWith('/') ? config.registryBrokerUrl : `${config.registryBrokerUrl}/`;
+  const url = new URL(path.startsWith('/') ? path.slice(1) : path, base);
+
+  const headers: Record<string, string> = {
+    accept: 'application/json',
+    ...(options.headers ?? {}),
+  };
+  if (config.registryBrokerApiKey && !headers['x-api-key'] && !headers['X-API-KEY']) {
+    headers['x-api-key'] = config.registryBrokerApiKey;
+  }
+
+  const method = options.method.toUpperCase();
+  const body =
+    options.body === undefined
+      ? undefined
+      : typeof options.body === 'string'
+        ? options.body
+        : JSON.stringify(options.body);
+
+  const request = async () => {
+    const response = await undiciFetch(url, { method, headers, body });
+    if (!response.ok) {
+      const hint = await safeReadBody(response);
+      throw new Error(`Registry broker request failed (${response.status}): ${hint ?? response.statusText}`);
+    }
+    return (await response.json()) as T;
+  };
+
+  if (brokerLimiter) {
+    return brokerLimiter.schedule(request);
+  }
+  return request();
+}
+
 async function safeReadBody(response: Response | UndiciResponse) {
   try {
     const text = await (response as any).text();
@@ -215,7 +275,15 @@ function formatBrokerError(error: unknown, label?: string): Error {
           : 'no response body';
     const statusText = error.statusText ? ` ${error.statusText}` : '';
     const prefix = label ? `${label} failed` : 'Registry broker request failed';
-    return new Error(`${prefix} (${error.status}${statusText}): ${body}`);
+    const hints: string[] = [];
+    if (error.status === 404) {
+      hints.push('endpoint not found (may be disabled on this broker environment)');
+    }
+    if (error.status === 401 || error.status === 403) {
+      hints.push('authorization required (check REGISTRY_BROKER_API_KEY / ledger keys)');
+    }
+    const hintText = hints.length ? ` [${hints.join('; ')}]` : '';
+    return new Error(`${prefix} (${error.status}${statusText}): ${body}${hintText}`);
   }
   return error instanceof Error ? error : new Error(String(error));
 }

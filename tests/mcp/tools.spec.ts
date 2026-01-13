@@ -6,59 +6,70 @@ process.env.HEDERA_ACCOUNT_ID = process.env.HEDERA_ACCOUNT_ID ?? '0.0.1234';
 process.env.HEDERA_PRIVATE_KEY =
   process.env.HEDERA_PRIVATE_KEY ?? '302e020100300506032b657004220420aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-const createFakeClient = () => ({
-  search: vi.fn().mockResolvedValue('search-result'),
-  vectorSearch: vi.fn().mockResolvedValue('vector-result'),
-  resolveUaid: vi.fn().mockResolvedValue('resolved'),
-  validateUaid: vi.fn().mockResolvedValue('validated'),
-  getUaidConnectionStatus: vi.fn().mockResolvedValue('status'),
-  closeUaidConnection: vi.fn().mockResolvedValue('closed'),
-  getRegistrationQuote: vi.fn().mockResolvedValue('quote'),
-  registerAgent: vi.fn().mockResolvedValue('registered'),
-  waitForRegistrationCompletion: vi.fn().mockResolvedValue('complete'),
-  updateAgent: vi.fn().mockResolvedValue('updated'),
-  getAdditionalRegistries: vi.fn().mockResolvedValue({ registries: [] }),
-  registrySearchByNamespace: vi.fn().mockResolvedValue({ hits: [] }),
-  chat: {
-    createSession: vi.fn().mockResolvedValue({ sessionId: 'session-1' }),
-    sendMessage: vi.fn().mockResolvedValue({ message: 'ok' }),
-    getHistory: vi.fn().mockResolvedValue([{ role: 'user', content: 'hi' }]),
-    compactHistory: vi.fn().mockResolvedValue({ pruned: 2 }),
-    endSession: vi.fn().mockResolvedValue({ ended: true }),
-  },
-  listProtocols: vi.fn().mockResolvedValue(['protocol']),
-  detectProtocol: vi.fn().mockResolvedValue({ name: 'proto' }),
-  stats: vi.fn().mockResolvedValue({ total: 10 }),
-  metricsSummary: vi.fn().mockResolvedValue({ latencyP50: 10 }),
-  dashboardStats: vi.fn().mockResolvedValue({ active: 5 }),
-  websocketStats: vi.fn().mockResolvedValue({ connections: 1 }),
-  createLedgerChallenge: vi.fn().mockResolvedValue({ challengeId: 'c1', message: 'sign-me' }),
-  verifyLedgerChallenge: vi.fn().mockResolvedValue({ key: 'ledger-key' }),
-  purchaseCreditsWithHbar: vi.fn().mockResolvedValue({ credits: 100 }),
-  getX402Minimums: vi.fn().mockResolvedValue({ minimums: {} }),
-  buyCreditsWithX402: vi.fn().mockResolvedValue({ creditedCredits: 100 }),
-});
+function createFakeClient() {
+  return {
+    search: vi.fn().mockResolvedValue('search-result'),
+    vectorSearch: vi.fn().mockResolvedValue('vector-result'),
+    resolveUaid: vi.fn().mockResolvedValue('resolved'),
+    validateUaid: vi.fn().mockResolvedValue('validated'),
+    getUaidConnectionStatus: vi.fn().mockResolvedValue('status'),
+    closeUaidConnection: vi.fn().mockResolvedValue('closed'),
+    getRegistrationQuote: vi.fn().mockResolvedValue('quote'),
+    registerAgent: vi.fn().mockResolvedValue('registered'),
+    waitForRegistrationCompletion: vi.fn().mockResolvedValue('complete'),
+    updateAgent: vi.fn().mockResolvedValue('updated'),
+    getAdditionalRegistries: vi.fn().mockResolvedValue({ registries: [] }),
+    registrySearchByNamespace: vi.fn().mockResolvedValue({ hits: [] }),
+    chat: {
+      createSession: vi.fn().mockResolvedValue({ sessionId: 'session-1' }),
+      sendMessage: vi.fn().mockResolvedValue({ message: 'ok' }),
+      getHistory: vi.fn().mockResolvedValue([{ role: 'user', content: 'hi' }]),
+      compactHistory: vi.fn().mockResolvedValue({ pruned: 2 }),
+      endSession: vi.fn().mockResolvedValue({ ended: true }),
+    },
+    listProtocols: vi.fn().mockResolvedValue(['protocol']),
+    detectProtocol: vi.fn().mockResolvedValue({ name: 'proto' }),
+    stats: vi.fn().mockResolvedValue({ total: 10 }),
+    metricsSummary: vi.fn().mockResolvedValue({ latencyP50: 10 }),
+    dashboardStats: vi.fn().mockResolvedValue({ active: 5 }),
+    websocketStats: vi.fn().mockResolvedValue({ connections: 1 }),
+    createLedgerChallenge: vi.fn().mockResolvedValue({ challengeId: 'c1', message: 'sign-me' }),
+    verifyLedgerChallenge: vi.fn().mockResolvedValue({ key: 'ledger-key' }),
+    purchaseCreditsWithHbar: vi.fn().mockResolvedValue({ credits: 100 }),
+    getX402Minimums: vi.fn().mockResolvedValue({ minimums: {} }),
+    buyCreditsWithX402: vi.fn().mockResolvedValue({ creditedCredits: 100 }),
+  };
+}
 
-const fakeClient = createFakeClient();
-const getCreditBalanceMock = vi.fn().mockResolvedValue({
-  accountId: '0.0.123',
-  balance: 500,
-  timestamp: new Date().toISOString(),
+const { fakeClient, getCreditBalanceMock, loggerSpy, recordEntryMock, requestBrokerJsonMock, withBrokerMock } = vi.hoisted(() => {
+  const fakeClient = createFakeClient();
+  const getCreditBalanceMock = vi.fn().mockResolvedValue({
+    accountId: '0.0.123',
+    balance: 500,
+    timestamp: new Date().toISOString(),
+  });
+  const requestBrokerJsonMock = vi.fn().mockResolvedValue('agentic-result');
+  const withBrokerMock = vi.fn(
+    (fn: (client: typeof fakeClient) => Promise<unknown>, _label?: string, _options?: unknown) => fn(fakeClient),
+  );
+  const recordEntryMock = vi.fn().mockResolvedValue(undefined);
+  const loggerSpy = {
+    debug: vi.fn(),
+    info: vi.fn(),
+    error: vi.fn(),
+  };
+  return { fakeClient, getCreditBalanceMock, loggerSpy, recordEntryMock, requestBrokerJsonMock, withBrokerMock };
 });
-const recordEntryMock = vi.fn();
-const withBrokerMock = vi.fn((fn: (client: typeof fakeClient) => Promise<unknown>) => fn(fakeClient));
-
-const loggerSpy = {
-  debug: vi.fn(),
-  info: vi.fn(),
-  error: vi.fn(),
-};
 
 vi.mock('../../src/broker', () => ({
   withBroker: withBrokerMock,
+  withEncryptedBroker: vi.fn((_: unknown, fn: (client: typeof fakeClient) => Promise<unknown>) => fn(fakeClient)),
+  cacheConversationHandle: vi.fn(),
+  getCachedConversationHandle: vi.fn().mockReturnValue(undefined),
   broker: fakeClient,
   brokerLimiter: undefined,
   getCreditBalance: getCreditBalanceMock,
+  requestBrokerJson: requestBrokerJsonMock,
 }));
 
 vi.mock('../../src/memory', () => ({
@@ -99,6 +110,8 @@ const baseRegistrationPayload = {
 const schemaSamples: Record<string, { valid: unknown; invalid?: unknown }> = {
   'hol.search': { valid: { q: 'agent', limit: 5 }, invalid: { limit: 0 } },
   'hol.vectorSearch': { valid: { query: 'embedding' }, invalid: { query: '' } },
+  'hol.agenticSearch': { valid: { query: 'find ledger experts', limit: 5 }, invalid: { query: '' } },
+  'hol.delegate.suggest': { valid: { task: 'Find a ledger authentication expert', limit: 3 }, invalid: { task: '' } },
   'hol.resolveUaid': { valid: { uaid: 'uaid-1' }, invalid: { uaid: '' } },
   'hol.closeUaidConnection': { valid: { uaid: 'uaid-1' }, invalid: { uaid: '' } },
   'hol.getRegistrationQuote': { valid: { payload: baseRegistrationPayload }, invalid: { payload: null } },
@@ -119,6 +132,8 @@ const schemaSamples: Record<string, { valid: unknown; invalid?: unknown }> = {
   'hol.metricsSummary': { valid: {} },
   'hol.dashboardStats': { valid: {} },
   'hol.websocketStats': { valid: {} },
+  'hol.listProtocols': { valid: {} },
+  'hol.detectProtocol': { valid: { headers: { 'content-type': 'application/json' }, body: '{}' }, invalid: { headers: { accept: 1 } } },
   'hol.ledger.challenge': { valid: { accountId: '0.0.123', network: 'mainnet' }, invalid: { accountId: '', network: 'foo' } },
   'hol.ledger.authenticate': {
     valid: { challengeId: 'c1', accountId: '0.0.123', network: 'testnet', signature: '0xabc' },
@@ -145,6 +160,7 @@ const schemaSamples: Record<string, { valid: unknown; invalid?: unknown }> = {
   'hol.memory.clear': { valid: { scope: { namespace: 'demo' } }, invalid: { scope: {} } },
   'hol.memory.search': { valid: { scope: { uaid: 'uaid:1' }, query: 'hello', limit: 5 }, invalid: { scope: { uaid: 'uaid:1' }, query: '' } },
   'workflow.discovery': { valid: { query: 'hash', limit: 5 }, invalid: { limit: 0 } },
+  'workflow.delegate': { valid: { task: 'Ask an agent to summarize a log', limit: 1 }, invalid: { task: '' } },
   'workflow.registerMcp': { valid: { payload: baseRegistrationPayload }, invalid: { payload: null } },
   'workflow.chatSmoke': { valid: { uaid: 'uaid-123', message: 'hi' }, invalid: { uaid: '' } },
   'workflow.opsCheck': { valid: {} },
@@ -158,6 +174,7 @@ describe('mcp tool definitions', () => {
   beforeEach(() => {
     withBrokerMock.mockClear();
     getCreditBalanceMock.mockClear();
+    requestBrokerJsonMock.mockClear();
     fakeClient.search.mockClear();
     fakeClient.vectorSearch.mockClear();
     fakeClient.resolveUaid.mockClear();
@@ -193,6 +210,8 @@ describe('mcp tool definitions', () => {
     expect(registeredTools.map((tool) => tool.name)).toEqual([
       'hol.search',
       'hol.vectorSearch',
+      'hol.agenticSearch',
+      'hol.delegate.suggest',
       'hol.resolveUaid',
       'hol.closeUaidConnection',
       'hol.getRegistrationQuote',
@@ -214,6 +233,8 @@ describe('mcp tool definitions', () => {
       'hol.metricsSummary',
       'hol.dashboardStats',
       'hol.websocketStats',
+      'hol.listProtocols',
+      'hol.detectProtocol',
       'hol.ledger.challenge',
       'hol.ledger.authenticate',
       'hol.purchaseCredits.hbar',
@@ -236,6 +257,7 @@ describe('mcp tool definitions', () => {
       'workflow.erc8004X402',
       'workflow.x402Registration',
       'workflow.fullRegistration',
+      'workflow.delegate',
     ]);
   });
 
@@ -253,6 +275,133 @@ describe('mcp tool definitions', () => {
     const result = await tool.handler(payload as any);
     expect(fakeClient.search).toHaveBeenCalledWith(payload);
     expect(result).toBe('search-result');
+  });
+
+  it('delegates hol.agenticSearch to client.requestJson', async () => {
+    const tool = getTool('hol.agenticSearch');
+    const payload = schemaSamples['hol.agenticSearch'].valid as any;
+    const result = await tool.handler(payload);
+    expect(requestBrokerJsonMock).toHaveBeenCalledWith(
+      '/search/agentic',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'content-type': 'application/json' }),
+        body: expect.objectContaining({ query: payload.query }),
+      }),
+    );
+    expect(result).toBe('agentic-result');
+  });
+
+  it('suggests delegation candidates using broker discovery', async () => {
+    requestBrokerJsonMock.mockResolvedValueOnce({
+      hits: [
+        {
+          agent: {
+            uaid: 'uaid-agentic-1',
+            registry: 'hashnet',
+            profile: { display_name: 'Agentic One' },
+            trustScore: 80,
+            verified: true,
+            metadata: { available: true },
+          },
+          score: 0.95,
+          highlights: {},
+        },
+      ],
+      total: 1,
+      totalAvailable: 1,
+      visible: 1,
+      limited: false,
+      took: 12,
+    });
+    fakeClient.vectorSearch.mockResolvedValueOnce({
+      hits: [
+        {
+          agent: {
+            uaid: 'uaid-vector-1',
+            registry: 'hashnet',
+            profile: { display_name: 'Vector One' },
+            trustScore: 60,
+            verified: true,
+          },
+          score: 0.88,
+          highlights: {},
+        },
+      ],
+      total: 1,
+    });
+    fakeClient.search.mockResolvedValueOnce({
+      hits: [
+        {
+          uaid: 'uaid-keyword-1',
+          registry: 'hashnet',
+          profile: { display_name: 'Keyword One' },
+          trustScore: 50,
+          verified: false,
+          avgLatency: 100,
+        },
+      ],
+      total: 1,
+    });
+
+    const tool = getTool('hol.delegate.suggest');
+    const result = await tool.handler({ task: 'Find agents that know registry broker internals', limit: 2 });
+    expect(fakeClient.search).toHaveBeenCalledWith({ q: 'Find agents that know registry broker internals', limit: 8, type: 'ai-agents' });
+    expect(fakeClient.vectorSearch).toHaveBeenCalledWith({ query: 'Find agents that know registry broker internals', limit: 2 });
+    expect(requestBrokerJsonMock).toHaveBeenCalledWith(
+      '/search/agentic',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.objectContaining({ query: 'Find agents that know registry broker internals' }),
+      }),
+    );
+    const structured = result?.content?.find((entry: any) => typeof entry?.text === 'string' && entry.text.startsWith('delegate.suggest:\n'))?.text;
+    expect(structured).toBeTypeOf('string');
+    const json = JSON.parse(String(structured).replace(/^delegate\.suggest:\n/, ''));
+    expect(json.candidates.map((candidate: any) => candidate.uaid)).toEqual(['uaid-agentic-1', 'uaid-vector-1']);
+    expect(result).toMatchObject({
+      content: expect.any(Array),
+    });
+  });
+
+  it('enlists a delegation candidate automatically', async () => {
+    requestBrokerJsonMock.mockResolvedValueOnce({
+      hits: [
+        {
+          agent: {
+            uaid: 'uaid-agentic-1',
+            registry: 'hashnet',
+            profile: { display_name: 'Agentic One' },
+            trustScore: 80,
+            verified: true,
+            metadata: { available: true },
+          },
+          score: 0.95,
+          highlights: {},
+        },
+      ],
+      total: 1,
+      totalAvailable: 1,
+      visible: 1,
+      limited: false,
+      took: 12,
+    });
+    fakeClient.vectorSearch.mockResolvedValueOnce({ hits: [], total: 0 });
+    fakeClient.search.mockResolvedValueOnce({ hits: [], total: 0 });
+
+    const tool = getTool('workflow.delegate');
+    const result = await tool.handler({ task: 'Ask an agent to summarize a log', limit: 1 });
+
+    expect(requestBrokerJsonMock).toHaveBeenCalled();
+    expect(fakeClient.chat.createSession).toHaveBeenCalledWith({ uaid: 'uaid-agentic-1', auth: undefined });
+    expect(fakeClient.chat.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-1',
+        message: expect.stringContaining('Ask an agent to summarize a log'),
+      }),
+    );
+
+    expect(result).toMatchObject({ content: expect.any(Array) });
   });
 
   it('aggregates UAID utilities correctly', async () => {
@@ -328,11 +477,15 @@ describe('mcp tool definitions', () => {
     await getTool('hol.metricsSummary').handler({});
     await getTool('hol.dashboardStats').handler({});
     await getTool('hol.websocketStats').handler({});
+    await getTool('hol.listProtocols').handler({});
+    await getTool('hol.detectProtocol').handler({ headers: { 'content-type': 'application/json' }, body: '{}' });
 
     expect(fakeClient.stats).toHaveBeenCalled();
     expect(fakeClient.metricsSummary).toHaveBeenCalled();
     expect(fakeClient.dashboardStats).toHaveBeenCalled();
     expect(fakeClient.websocketStats).toHaveBeenCalled();
+    expect(fakeClient.listProtocols).toHaveBeenCalled();
+    expect(fakeClient.detectProtocol).toHaveBeenCalledWith({ headers: { 'content-type': 'application/json' }, body: '{}' });
   });
 
   it('supports registry maintenance helpers', async () => {

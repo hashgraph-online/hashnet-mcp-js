@@ -16,14 +16,14 @@ const opsDefinition: PipelineDefinition<OpsInput, OpsContext> = {
   name: 'workflow.opsCheck',
   description: 'Run stats, metrics, dashboard, listProtocols, detectProtocol.',
   version: '1.0.0',
-  requiredEnv: ['REGISTRY_BROKER_API_KEY'],
+  requiredEnv: [],
   createContext: () => ({}),
   steps: [
     {
       name: 'hol.stats',
       allowDuringDryRun: true,
       run: async ({ context }) => {
-        const response = await withBroker((client) => client.stats());
+        const response = await withBroker((client) => client.stats(), 'workflow.opsCheck hol.stats', { requireApiKey: false });
         context.stats = response;
         return response;
       },
@@ -32,7 +32,7 @@ const opsDefinition: PipelineDefinition<OpsInput, OpsContext> = {
       name: 'hol.metricsSummary',
       allowDuringDryRun: true,
       run: async ({ context }) => {
-        const response = await withBroker((client) => client.metricsSummary());
+        const response = await withBroker((client) => client.metricsSummary(), 'workflow.opsCheck hol.metricsSummary', { requireApiKey: false });
         context.metrics = response;
         return response;
       },
@@ -41,7 +41,7 @@ const opsDefinition: PipelineDefinition<OpsInput, OpsContext> = {
       name: 'hol.dashboardStats',
       allowDuringDryRun: true,
       run: async ({ context }) => {
-        const response = await withBroker((client) => client.dashboardStats());
+        const response = await withBroker((client) => client.dashboardStats(), 'workflow.opsCheck hol.dashboardStats', { requireApiKey: false });
         context.dashboard = response;
         return response;
       },
@@ -49,17 +49,20 @@ const opsDefinition: PipelineDefinition<OpsInput, OpsContext> = {
     {
       name: 'hol.listProtocols',
       allowDuringDryRun: true,
-      run: async () => withBroker((client) => client.listProtocols()),
+      run: async () => withBroker((client) => client.listProtocols(), 'workflow.opsCheck hol.listProtocols', { requireApiKey: false }),
     },
     {
       name: 'hol.detectProtocol',
       allowDuringDryRun: true,
       run: async () =>
-        withBroker((client) =>
-          client.detectProtocol({
-            headers: { 'content-type': 'application/json' },
-            body: '{}',
-          } as any),
+        withBroker(
+          (client) =>
+            client.detectProtocol({
+              headers: { 'content-type': 'application/json' },
+              body: '{}',
+            }),
+          'workflow.opsCheck hol.detectProtocol',
+          { requireApiKey: false },
         ),
     },
   ],

@@ -54,7 +54,7 @@ const baseProfileSchema = z.object({
   socials: z.array(socialLinkSchema).optional(),
   profileImage: z.string().optional(),
   uaid: z.string().optional(),
-  properties: z.record(z.string(), z.any()).optional(),
+  properties: z.record(z.string(), z.unknown()).optional(),
   inboundTopicId: z.string().optional(),
   outboundTopicId: z.string().optional(),
   base_account: z.string().optional(),

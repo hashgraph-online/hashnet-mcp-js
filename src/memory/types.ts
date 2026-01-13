@@ -40,7 +40,7 @@ export interface MemoryStore {
 
 export interface MemoryConfig {
   enabled: boolean;
-  store: 'sqlite' | 'rocksdb' | 'memory' | 'redis';
+  store: 'file' | 'sqlite' | 'rocksdb' | 'memory' | 'redis';
   path?: string;
   maxEntriesPerScope: number;
   defaultTtlSeconds?: number;

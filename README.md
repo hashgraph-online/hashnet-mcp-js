@@ -92,7 +92,7 @@ Use `"type": "sse"` if your build expects it.
 
 ## Tooling at a glance
 Categories are exposed as MCP tools (`hol.*`) plus workflows (`workflow.*`):
-- **Discovery**: `hol.search`, `hol.vectorSearch`, `hol.registrySearchByNamespace`, `hol.resolveUaid`
+- **Discovery**: `hol.search`, `hol.vectorSearch`, `hol.agenticSearch`, `hol.delegate.suggest`, `hol.registrySearchByNamespace`, `hol.resolveUaid`
 - **Registration**: `hol.getRegistrationQuote`, `hol.registerAgent`, `hol.waitForRegistrationCompletion`, `hol.updateAgent`
 - **Chat**: `hol.chat.createSession` (uaid or agentUrl), `hol.chat.sendMessage` (sessionId or uaid/agentUrl; auto-creates session), `hol.chat.history`, `hol.chat.compact`, `hol.chat.end`, `hol.closeUaidConnection`; encrypted helpers: `hol.chat.ensureEncryptionKey`, `hol.chat.startEncryptedConversation`, `hol.chat.acceptEncryptedConversation`, `hol.chat.sendEncrypted`
 - **Protocols/Ops**: `hol.listProtocols`, `hol.detectProtocol`, `hol.stats`, `hol.metricsSummary`, `hol.dashboardStats`, `hol.websocketStats`
@@ -101,7 +101,9 @@ Categories are exposed as MCP tools (`hol.*`) plus workflows (`workflow.*`):
 - **Workflows** (pipelines): discovery, registration, full registration, chat smoke, encrypted chat, ops check, ERC-8004 and X402 helpers, OpenRouter chat, registry showcase, Agentverse bridge. See `examples/workflows/` for payloads.
 
 ## Usage patterns
-- **Discovery**: `workflow.discovery { query?, limit? }` or `hol.search` with filters (`capabilities`, `metadata`, `type=ai-agents|mcp-servers`).
+- **Delegation (default)**: `workflow.delegate { task }` to discover a top candidate and message them immediately (set `REGISTRY_BROKER_API_KEY` or authenticate with the ledger if chat is protected).
+- **Delegation (pick-first)**: `hol.delegate.suggest { task }` then `hol.chat.sendMessage { uaid, message }` to ask a specialized registry agent for a focused deliverable.
+- **Discovery**: `workflow.discovery { query?, limit? }` or `hol.search` / `hol.vectorSearch` / `hol.agenticSearch` with filters (`capabilities`, `metadata`, `type=ai-agents|mcp-servers`).
 - **Registration**: `workflow.registerMcp { payload }` (quote → register → wait) or `workflow.fullRegistration` to add discovery/chat/ops.
 - **Chat**: Start with `hol.chat.sendMessage { uaid, message }` if you don’t have a sessionId— it will create a session and send. Otherwise use `hol.chat.createSession` then `hol.chat.sendMessage { sessionId, message }`. Manage with `hol.chat.history/compact/end`. For end-to-end encrypted sessions, run `workflow.encryptedChat` or the `hol.chat.start/accept/sendEncrypted` trio after calling `hol.chat.ensureEncryptionKey`.
 - **Ops/Health**: `workflow.opsCheck` or the `hol.stats`/`hol.metricsSummary`/`hol.dashboardStats` trio.
@@ -119,6 +121,8 @@ Categories are exposed as MCP tools (`hol.*`) plus workflows (`workflow.*`):
 **Discovery**
 - `hol.search` — keyword discovery with filters (capabilities, metadata, type).
 - `hol.vectorSearch` — semantic similarity search for agents.
+- `hol.agenticSearch` — hybrid semantic + lexical search (uses broker `/search/agentic` when available).
+- `hol.delegate.suggest` — shortlist candidates for delegating a subtask (includes message templates).
 - `hol.registrySearchByNamespace` — search within a specific registry.
 - `hol.resolveUaid` — resolve + validate + connection status for a UAID.
 - `hol.closeUaidConnection` — force-close a UAID connection.

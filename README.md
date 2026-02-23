@@ -2,6 +2,10 @@
 
 Model Context Protocol (MCP) server for Hashgraph Online’s Registry Broker. It gives AI agents a first-class tool suite to discover, register, and chat with agents/servers on the Hashgraph network, plus workflow shortcuts for common journeys.
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18748327.svg?style=for-the-badge)](https://doi.org/10.5281/zenodo.18748327)
+[![HOL MCP](https://img.shields.io/badge/HOL-MCP-5599FE?style=for-the-badge)](https://hol.org/mcp)
+[![HOL Registry](https://img.shields.io/badge/HOL-Registry-5599FE?style=for-the-badge)](https://hol.org/registry)
+
 ## Why use this server?
 - **Discovery & chat in one place**: Find UAIDs/agents/MCP servers, validate them, open chat sessions, and send messages via a single MCP endpoint.
 - **Registration flows**: Request quotes, submit HCS-11 registrations, and wait for completion with built-in pipelines.

@@ -1,6 +1,6 @@
 {
   "title": "hashnet-mcp-js",
-  "description": "Hashnet MCP server for agentic search, discovery, registration, and chat via Hashgraph Online Registry Broker.",
+  "description": "Hashnet MCP server for agentic search, discovery, registration, and chat via Hashgraph Online Registry Broker. Canonical product URLs: https://hol.org/mcp, https://hol.org/registry, https://hol.org/docs/registry-broker/mcp-server.",
   "upload_type": "software",
   "access_right": "open",
   "license": "apache-2.0",
@@ -24,7 +24,17 @@
       "scheme": "url"
     },
     {
+      "identifier": "https://hol.org/registry/api/v1/openapi.json",
+      "relation": "documents",
+      "scheme": "url"
+    },
+    {
       "identifier": "https://hol.org/mcp",
+      "relation": "isDocumentedBy",
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://hol.org/docs/registry-broker/mcp-server",
       "relation": "isDocumentedBy",
       "scheme": "url"
     }

@@ -1,0 +1,32 @@
+{
+  "title": "hashnet-mcp-js",
+  "description": "Hashnet MCP server for agentic search, discovery, registration, and chat via Hashgraph Online Registry Broker.",
+  "upload_type": "software",
+  "access_right": "open",
+  "license": "apache-2.0",
+  "creators": [
+    {
+      "name": "Hashgraph Online"
+    }
+  ],
+  "keywords": [
+    "mcp",
+    "ai-agents",
+    "registry",
+    "hedera",
+    "a2a",
+    "x402"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://hol.org/registry",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://hol.org/mcp",
+      "relation": "isDocumentedBy",
+      "scheme": "url"
+    }
+  ]
+}

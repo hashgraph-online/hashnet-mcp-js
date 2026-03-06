@@ -14,6 +14,29 @@ No-stubs MCP server that bridges MCP tools to the HOL Registry Broker using `@ha
    - stdio: `pnpm dev:stdio`
    - HTTP + legacy SSE: `pnpm dev:http:compat`
 
+## NPX Launch
+
+Once this package is published, you can launch it directly with `npx`:
+
+- stdio: `REGISTRY_BROKER_API_KEY=... npx @hol-org/hashnet-mcp --stdio`
+- HTTP: `REGISTRY_BROKER_API_KEY=... npx @hol-org/hashnet-mcp --http --host 127.0.0.1 --port 3333`
+- help: `npx @hol-org/hashnet-mcp --help`
+
+When installed globally or linked locally, the binary name is `hashnet-mcp`.
+
+Supported CLI flags:
+
+- `--transport <stdio|http>`
+- `--stdio`
+- `--http`
+- `--host <host>`
+- `--port <port>`
+- `--allowed-origins <csv>`
+- `--broker-url <url>`
+- `--bearer-token <token>`
+- `--log-level <level>`
+- `--legacy-sse`
+
 ## Commands
 
 - `pnpm build`

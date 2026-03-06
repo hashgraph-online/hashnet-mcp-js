@@ -1,9 +1,17 @@
 {
-  "name": "hol-mcp-server-poc",
+  "name": "@hol-org/hashnet-mcp",
   "version": "0.1.0",
   "description": "No-stubs HOL MCP Server POC",
   "type": "module",
   "license": "Apache-2.0",
+  "bin": "./bin/hashnet-mcp.js",
+  "files": [
+    "bin",
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "main": "./dist/index.js",
   "engines": {
     "node": ">=20"
   },
@@ -21,7 +29,8 @@
     "live:runs": "tsx scripts/e2e/live-runs.ts",
     "smoke:http": "tsx scripts/e2e/streamable-http-smoke.ts",
     "smoke:stdio": "tsx scripts/e2e/stdio-smoke.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepack": "pnpm build"
   },
   "dependencies": {
     "@hashgraphonline/standards-sdk": "^0.1.164",

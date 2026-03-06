@@ -1,8 +1,0 @@
-{
-  "uaid": "uaid:registry:demo-hashnet",
-  "message": "Hello from workflow.chatSmoke sample",
-  "auth": {
-    "type": "bearer",
-    "token": "AGENT_BEARER_TOKEN_PLACEHOLDER"
-  }
-}

@@ -4,7 +4,9 @@
   "description": "No-stubs HOL MCP Server POC",
   "type": "module",
   "license": "Apache-2.0",
-  "bin": "./bin/hashnet-mcp.js",
+  "bin": {
+    "hashnet-mcp": "./bin/hashnet-mcp.js"
+  },
   "files": [
     "bin",
     "dist",

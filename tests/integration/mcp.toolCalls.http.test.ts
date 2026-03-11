@@ -5,6 +5,7 @@ import { createBrokerRateLimiter } from "../../src/broker/rateLimit.js";
 import type { EnvConfig } from "../../src/config/env.js";
 import { createMcpServer } from "../../src/mcp/createServer.js";
 import { createLogger } from "../../src/observability/logger.js";
+import { createRequestRateLimiter } from "../../src/transports/requestRateLimit.js";
 import { runStreamableHttp, type RunningHttpServer } from "../../src/transports/httpStreamable.js";
 
 const protocolVersion = "2025-06-18";
@@ -233,5 +234,160 @@ describe("MCP HTTP tool calls", () => {
     expect(stats.payload.result?.isError).not.toBe(true);
     expect(stats.payload.result?.structuredContent?.ok).toBe(true);
     expect(stats.payload.result?.structuredContent?.data?.stats?.totalAgents).toBe(42);
+  });
+
+  test("returns 429 when the streamable HTTP request budget is exhausted", async () => {
+    const port = 3800 + Math.floor(Math.random() * 300);
+    const env: EnvConfig = {
+      registryBrokerApiUrl: "https://example.com/registry/api/v1",
+      registryBrokerApiKey: "integration-test-key",
+      brokerRequestTimeoutMs: 10_000,
+      mcpTransport: "http",
+      mcpHost: "127.0.0.1",
+      mcpPort: port,
+      mcpAllowedOrigins: ["http://localhost:*", "http://127.0.0.1:*"],
+      mcpServerBearerToken: undefined,
+      mcpSessionIdleTtlMs: 60_000,
+      mcpSessionMaxCount: 10,
+      mcpSessionReapIntervalMs: 1_000,
+      logLevel: "silent",
+      brokerRateLimitConcurrency: 5,
+      brokerRateLimitMinTimeMs: 1,
+      hederaNetwork: undefined,
+      hederaAccountId: undefined,
+      hederaPrivateKey: undefined,
+      evmLedgerNetwork: undefined,
+      ethPrivateKey: undefined,
+      rbEncryptionPrivateKey: undefined,
+    };
+
+    const flags = {
+      featureLegacySse: false,
+      featureMemorySqlite: false,
+      featureMemoryRedis: false,
+      featureLedgerAuth: false,
+      featureEncryptedChat: false,
+    };
+
+    const logger = createLogger({ logLevel: "silent" });
+    rateLimiter = createBrokerRateLimiter(env);
+
+    const createServer = () =>
+      createMcpServer({
+        env,
+        flags,
+        logger,
+        rateLimiter: rateLimiter!,
+      });
+
+    running = await runStreamableHttp({
+      env,
+      flags,
+      logger,
+      createServer,
+      requestRateLimiter: createRequestRateLimiter({
+        maxRequests: 1,
+        windowMs: 60_000,
+      }),
+    });
+
+    const url = `http://${env.mcpHost}:${env.mcpPort}/mcp`;
+    const requestBody = {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: {
+        protocolVersion,
+        capabilities: { tools: {}, logging: {} },
+        clientInfo: { name: "integration-test", version: "0.1.0" },
+      },
+    };
+
+    const first = await postJson(url, requestBody, {
+      "mcp-protocol-version": protocolVersion,
+    });
+    expect(first.response.status).toBe(200);
+
+    const second = await postJson(url, requestBody, {
+      "mcp-protocol-version": protocolVersion,
+    });
+    expect(second.response.status).toBe(429);
+    expect(second.payload.error?.message).toContain("Rate limit exceeded");
+  });
+
+  test("returns 429 when the legacy SSE request budget is exhausted", async () => {
+    const port = 4100 + Math.floor(Math.random() * 300);
+    const env: EnvConfig = {
+      registryBrokerApiUrl: "https://example.com/registry/api/v1",
+      registryBrokerApiKey: "integration-test-key",
+      brokerRequestTimeoutMs: 10_000,
+      mcpTransport: "http",
+      mcpHost: "127.0.0.1",
+      mcpPort: port,
+      mcpAllowedOrigins: ["http://localhost:*", "http://127.0.0.1:*"],
+      mcpServerBearerToken: undefined,
+      mcpSessionIdleTtlMs: 60_000,
+      mcpSessionMaxCount: 10,
+      mcpSessionReapIntervalMs: 1_000,
+      logLevel: "silent",
+      brokerRateLimitConcurrency: 5,
+      brokerRateLimitMinTimeMs: 1,
+      hederaNetwork: undefined,
+      hederaAccountId: undefined,
+      hederaPrivateKey: undefined,
+      evmLedgerNetwork: undefined,
+      ethPrivateKey: undefined,
+      rbEncryptionPrivateKey: undefined,
+    };
+
+    const flags = {
+      featureLegacySse: true,
+      featureMemorySqlite: false,
+      featureMemoryRedis: false,
+      featureLedgerAuth: false,
+      featureEncryptedChat: false,
+    };
+
+    const logger = createLogger({ logLevel: "silent" });
+    rateLimiter = createBrokerRateLimiter(env);
+
+    const createServer = () =>
+      createMcpServer({
+        env,
+        flags,
+        logger,
+        rateLimiter: rateLimiter!,
+      });
+
+    running = await runStreamableHttp({
+      env,
+      flags,
+      logger,
+      createServer,
+      requestRateLimiter: createRequestRateLimiter({
+        maxRequests: 1,
+        windowMs: 60_000,
+      }),
+    });
+
+    const url = `http://${env.mcpHost}:${env.mcpPort}/mcp/sse`;
+    const first = await fetch(url, {
+      headers: {
+        accept: "text/event-stream",
+      },
+    });
+    expect(first.status).toBe(200);
+    await first.body?.cancel();
+
+    const second = await fetch(url, {
+      headers: {
+        accept: "text/event-stream",
+      },
+    });
+    expect(second.status).toBe(429);
+    const payload = (await second.json()) as {
+      error?: { message?: string };
+    };
+    expect(payload.error?.message).toContain("Rate limit exceeded");
   });
 });

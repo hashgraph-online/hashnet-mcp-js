@@ -12,6 +12,11 @@ import type { FeatureFlags } from "../config/featureFlags.js";
 import type { AppLogger } from "../observability/logger.js";
 import { registerLegacySseRoutes } from "./httpLegacySse.js";
 import { enforceBearerAuth, enforceOrigin } from "./originValidation.js";
+import {
+  createRequestRateLimiter,
+  enforceRequestRateLimit,
+  type RequestRateLimiter,
+} from "./requestRateLimit.js";
 import type { SessionRegistryStats } from "./sessionRegistry.js";
 import { createSessionRegistry, SessionCapacityError } from "./sessionRegistry.js";
 
@@ -20,6 +25,7 @@ interface RunStreamableHttpOptions {
   flags: FeatureFlags;
   logger: AppLogger;
   createServer: () => McpServer;
+  requestRateLimiter?: RequestRateLimiter;
 }
 
 export interface RunningHttpServer {
@@ -93,8 +99,13 @@ export async function runStreamableHttp(options: RunStreamableHttpOptions): Prom
     idleTtlMs: env.mcpSessionIdleTtlMs,
     maxSessions: env.mcpSessionMaxCount,
   });
+  const requestRateLimiter = options.requestRateLimiter ?? createRequestRateLimiter();
 
   const validateRequest = (req: Request, res: Response): boolean => {
+    if (!enforceRequestRateLimit(req, res, requestRateLimiter)) {
+      return false;
+    }
+
     if (!enforceOrigin(req, res, env.mcpAllowedOrigins, logger)) {
       return false;
     }

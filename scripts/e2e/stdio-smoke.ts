@@ -155,6 +155,7 @@ async function run(): Promise<void> {
   } catch (error) {
     throw new Error(
       `${error instanceof Error ? error.message : String(error)}\nServer stderr tail:\n${stderrTail}`,
+      { cause: error },
     );
   } finally {
     for (const request of pending.values()) {

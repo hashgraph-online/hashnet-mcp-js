@@ -31,10 +31,6 @@ function stringify(value: unknown): string {
   }
 }
 
-function textContent(text: string): CallToolResult["content"] {
-  return [{ type: "text", text }];
-}
-
 function categoryFromStatus(status: number):
   | "auth"
   | "validation"

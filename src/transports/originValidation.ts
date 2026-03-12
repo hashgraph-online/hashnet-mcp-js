@@ -1,4 +1,4 @@
-import type { Request, Response } from "express";
+import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 import type { AppLogger } from "../observability/logger.js";
 
@@ -89,6 +89,19 @@ export function enforceOrigin(
   return false;
 }
 
+export function createOriginMiddleware(
+  allowedOrigins: string[],
+  logger: AppLogger,
+): RequestHandler {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!enforceOrigin(req, res, allowedOrigins, logger)) {
+      return;
+    }
+
+    next();
+  };
+}
+
 export function enforceBearerAuth(
   req: Request,
   res: Response,
@@ -114,4 +127,16 @@ export function enforceBearerAuth(
     id: null,
   });
   return false;
+}
+
+export function createBearerAuthMiddleware(
+  bearerToken: string | undefined,
+): RequestHandler {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!enforceBearerAuth(req, res, bearerToken)) {
+      return;
+    }
+
+    next();
+  };
 }

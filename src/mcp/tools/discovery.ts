@@ -54,7 +54,9 @@ export function registerDiscoveryTools(server: McpServer, ctx: ToolRegisterConte
         });
       }
 
-      const { q: _q, query: _query, ...rest } = args;
+      const { q, query: queryArg, ...rest } = args;
+      void q;
+      void queryArg;
 
       return executeTool(ctx, extra, {
         toolName: "hol.search",

@@ -1,4 +1,4 @@
-import type { Request, Response } from "express";
+import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 interface RequestBucket {
   count: number;
@@ -128,4 +128,16 @@ export function enforceRequestRateLimit(
     `Rate limit exceeded. Retry in ${result.retryAfterSeconds ?? 1} seconds.`,
   );
   return false;
+}
+
+export function createRequestRateLimitMiddleware(
+  limiter: RequestRateLimiter,
+): RequestHandler {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!enforceRequestRateLimit(req, res, limiter)) {
+      return;
+    }
+
+    next();
+  };
 }

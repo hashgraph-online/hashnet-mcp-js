@@ -60,6 +60,15 @@ function isRetryableStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
 }
 
+function statusLike(error: unknown): number | undefined {
+  if (!error || typeof error !== "object" || !("status" in error)) {
+    return undefined;
+  }
+
+  const status = (error as { status?: unknown }).status;
+  return typeof status === "number" ? status : undefined;
+}
+
 function normalizeMessage(value: unknown, fallbackMessage: string): string {
   if (value instanceof Error && value.message) {
     return `${fallbackMessage}: ${value.message}`;
@@ -118,6 +127,18 @@ export function toMcpToolError(
   }
 
   if (error instanceof Error) {
+    const status = statusLike(error);
+    if (status) {
+      return errorResult(normalizeMessage(error, fallbackMessage), undefined, {
+        code: "TOOL_STATUS_ERROR",
+        category: categoryFromStatus(status),
+        retryable: isRetryableStatus(status),
+        statusCode: status,
+        traceId: meta.traceId,
+        durationMs: meta.durationMs,
+      });
+    }
+
     return errorResult(`${fallbackMessage}: ${error.message}`, undefined, {
       code: "TOOL_EXECUTION_FAILED",
       category: "internal",

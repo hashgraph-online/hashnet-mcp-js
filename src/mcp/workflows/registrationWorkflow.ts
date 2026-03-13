@@ -33,7 +33,7 @@ export function registerRegistrationWorkflow(server: McpServer, ctx: ToolRegiste
             extra.sessionId,
           );
 
-          const quote = await ctx.withBroker(traceId, "getRegistrationQuote", (client) =>
+          const quote = await ctx.withBrokerAuth(traceId, "getRegistrationQuote", (client) =>
             client.getRegistrationQuote(args.payload as Record<string, unknown>),
           );
 
@@ -45,7 +45,7 @@ export function registerRegistrationWorkflow(server: McpServer, ctx: ToolRegiste
             extra.sessionId,
           );
 
-          const registration = await ctx.withBroker(traceId, "registerAgent", (client) =>
+          const registration = await ctx.withBrokerAuth(traceId, "registerAgent", (client) =>
             client.registerAgent(args.payload as Record<string, unknown>),
           );
 
@@ -64,7 +64,7 @@ export function registerRegistrationWorkflow(server: McpServer, ctx: ToolRegiste
               extra.sessionId,
             );
 
-            progress = await ctx.withBroker(traceId, "waitForRegistrationCompletion", (client) =>
+            progress = await ctx.withBrokerAuth(traceId, "waitForRegistrationCompletion", (client) =>
               client.waitForRegistrationCompletion(attemptId, {
                 intervalMs: args.pollIntervalMs,
                 timeoutMs: args.timeoutMs,

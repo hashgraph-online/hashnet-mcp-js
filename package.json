@@ -5,7 +5,7 @@
   "type": "module",
   "license": "Apache-2.0",
   "bin": {
-    "hashnet-mcp": "./bin/hashnet-mcp.js"
+    "hashnet-mcp": "bin/hashnet-mcp.js"
   },
   "files": [
     "bin",
@@ -36,7 +36,7 @@
     "prepack": "pnpm build"
   },
   "dependencies": {
-    "@hashgraphonline/standards-sdk": "^0.1.164",
+    "@hashgraphonline/standards-sdk": "^0.1.165",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "bottleneck": "^2.19.5",
     "dotenv": "^17.3.1",

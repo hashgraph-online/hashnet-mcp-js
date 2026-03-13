@@ -31,7 +31,7 @@ export function registerDiscoveryWorkflow(server: McpServer, ctx: ToolRegisterCo
           return {
             query: args.query,
             totalHits: Array.isArray(results.hits) ? results.hits.length : 0,
-            topHits: (results.hits ?? []).slice(0, args.limit ?? 10).map((hit) => ({
+            topHits: (results.hits ?? []).slice(0, args.limit ?? 10).map((hit: Record<string, unknown>) => ({
               uaid: typeof hit.uaid === "string" ? hit.uaid : undefined,
               name: typeof hit.name === "string" ? hit.name : undefined,
               description: typeof hit.description === "string" ? hit.description : undefined,

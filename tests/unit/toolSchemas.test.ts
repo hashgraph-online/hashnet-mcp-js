@@ -23,6 +23,8 @@ import {
   registrationPayloadSchema,
   toolErrorEnvelopeSchema,
   waitRegistrationInputSchema,
+  workflowDelegateInputSchema,
+  workflowDelegateOutputSchema,
   workflowDiscoveryInputSchema,
   workflowDiscoveryOutputSchema,
   workflowRegistrationInputSchema,
@@ -37,11 +39,17 @@ describe("tool schemas", () => {
   });
 
   test("chat schemas accept valid payloads", () => {
-    expect(holChatCreateSessionInputSchema.safeParse({ uaid: "uaid:abc" }).success).toBe(true);
+    expect(
+      holChatCreateSessionInputSchema.safeParse({
+        uaid: "uaid:abc",
+        auth: { type: "bearer", token: "token-1" },
+      }).success,
+    ).toBe(true);
     expect(
       holChatSendMessageInputSchema.safeParse({
         sessionId: "session-1",
         message: "hello",
+        auth: { type: "header", headerName: "x-demo", headerValue: "value" },
         senderUaid: "uaid:sender",
         historyTtlSeconds: 300,
         encryptionRequested: true,
@@ -61,6 +69,13 @@ describe("tool schemas", () => {
     expect(registrationPayloadSchema.safeParse(payload).success).toBe(true);
     expect(waitRegistrationInputSchema.safeParse({ attemptId: "attempt-1", timeoutMs: 1000 }).success).toBe(true);
     expect(workflowDiscoveryInputSchema.safeParse({ query: "support", limit: 3 }).success).toBe(true);
+    expect(
+      workflowDelegateInputSchema.safeParse({
+        task: "Review this pull request.",
+        query: "typescript reviewer",
+        auth: { type: "apiKey", token: "token-1" },
+      }).success,
+    ).toBe(true);
     expect(workflowRegistrationInputSchema.safeParse({ payload, wait: true }).success).toBe(true);
     expect(
       workflowDiscoveryInputSchema.safeParse({
@@ -174,12 +189,38 @@ describe("tool schemas", () => {
       }).success,
     ).toBe(true);
     expect(
+      workflowDelegateOutputSchema.safeParse({
+        ok: true,
+        data: {
+          task: "Review this pull request.",
+          query: "typescript reviewer",
+          candidateCount: 1,
+          selectedAgent: {
+            uaid: "uaid:delegate-1",
+            name: "Registry Reviewer",
+            agentUrl: "https://delegate.example.com/mcp",
+            score: 0.99,
+          },
+          session: { sessionId: "session-1" },
+          response: { accepted: true },
+          search: { hits: [] },
+        },
+        meta,
+      }).success,
+    ).toBe(true);
+    expect(
       holCapabilitiesOutputSchema.safeParse({
         ok: true,
         data: {
           server: { name: "hol-mcp-server-poc", version: "0.1.0" },
           transports: { stdio: true, http: true, legacySse: false },
-          auth: { brokerApiKeyConfigured: true, httpBearerRequired: false },
+          auth: {
+            brokerApiKeyConfigured: true,
+            ledgerAuthConfigured: false,
+            ledgerAuthMode: "none",
+            paidToolAuthAvailable: true,
+            httpBearerRequired: false,
+          },
           limits: {
             brokerRateLimitConcurrency: 5,
             brokerRateLimitMinTimeMs: 100,

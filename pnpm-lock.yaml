@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@hashgraphonline/standards-sdk':
-        specifier: ^0.1.164
-        version: 0.1.164(@reown/appkit-controllers@1.8.17(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.3.6))(@reown/appkit@1.8.17(bufferutil@4.1.0)(debug@4.4.3)(typescript@5.9.3)(use-sync-external-store@1.4.0)(utf-8-validate@5.0.10)(zod@4.3.6))(@solana/sysvars@5.5.1(typescript@5.9.3))(ansi-regex@6.2.2)(ansi-styles@6.2.3)(bufferutil@4.1.0)(debug@4.4.3)(protobufjs@7.5.4)(strip-ansi@7.1.2)(typescript@5.9.3)(use-sync-external-store@1.4.0)(utf-8-validate@5.0.10)
+        specifier: ^0.1.165
+        version: 0.1.165(@reown/appkit-controllers@1.8.17(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.3.6))(@reown/appkit@1.8.17(bufferutil@4.1.0)(debug@4.4.3)(typescript@5.9.3)(use-sync-external-store@1.4.0)(utf-8-validate@5.0.10)(zod@4.3.6))(@solana/sysvars@5.5.1(typescript@5.9.3))(ansi-regex@6.2.2)(ansi-styles@6.2.3)(bufferutil@4.1.0)(debug@4.4.3)(protobufjs@7.5.4)(strip-ansi@7.1.2)(typescript@5.9.3)(use-sync-external-store@1.4.0)(utf-8-validate@5.0.10)
       '@modelcontextprotocol/sdk':
         specifier: ^1.27.1
         version: 1.27.1(zod@4.3.6)
@@ -455,8 +455,8 @@ packages:
   '@hashgraphonline/hashinal-wc@2.0.64':
     resolution: {integrity: sha512-3mwAEW5Fhg6II9i0a6x6MGMk70K3uo3V1ha0Jr7J/prsV6p+yZbvcgtr01ZyITqv5Hg1WKYUwaRO3MVOiaYPWA==}
 
-  '@hashgraphonline/standards-sdk@0.1.164':
-    resolution: {integrity: sha512-lLqIonWj6IMtHbDHB0I64T3bkSjbsrRmgqHQI8abty5NZ2cLoBO1wMhWHAHsDJtrugJTiOsuINeTvz0aBOj47A==}
+  '@hashgraphonline/standards-sdk@0.1.165':
+    resolution: {integrity: sha512-kReCZPXUc5nmrJPQL1UEw5fOmPuMycQ3wy5ezb6jEtWcBwb/ynivd7voZhu94PP28t0bqwnLHxbbkwzftXf75A==}
     peerDependencies:
       '@hiero-did-sdk/registrar': ^0.1.8
       '@hiero-did-sdk/resolver': ^0.1.8
@@ -4655,7 +4655,7 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@hashgraphonline/standards-sdk@0.1.164(@reown/appkit-controllers@1.8.17(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.3.6))(@reown/appkit@1.8.17(bufferutil@4.1.0)(debug@4.4.3)(typescript@5.9.3)(use-sync-external-store@1.4.0)(utf-8-validate@5.0.10)(zod@4.3.6))(@solana/sysvars@5.5.1(typescript@5.9.3))(ansi-regex@6.2.2)(ansi-styles@6.2.3)(bufferutil@4.1.0)(debug@4.4.3)(protobufjs@7.5.4)(strip-ansi@7.1.2)(typescript@5.9.3)(use-sync-external-store@1.4.0)(utf-8-validate@5.0.10)':
+  '@hashgraphonline/standards-sdk@0.1.165(@reown/appkit-controllers@1.8.17(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.3.6))(@reown/appkit@1.8.17(bufferutil@4.1.0)(debug@4.4.3)(typescript@5.9.3)(use-sync-external-store@1.4.0)(utf-8-validate@5.0.10)(zod@4.3.6))(@solana/sysvars@5.5.1(typescript@5.9.3))(ansi-regex@6.2.2)(ansi-styles@6.2.3)(bufferutil@4.1.0)(debug@4.4.3)(protobufjs@7.5.4)(strip-ansi@7.1.2)(typescript@5.9.3)(use-sync-external-store@1.4.0)(utf-8-validate@5.0.10)':
     dependencies:
       '@hashgraph/hedera-wallet-connect': 2.0.6(@reown/appkit-controllers@1.8.17(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.3.6))(@reown/appkit@1.8.17(bufferutil@4.1.0)(debug@4.4.3)(typescript@5.9.3)(use-sync-external-store@1.4.0)(utf-8-validate@5.0.10)(zod@4.3.6))(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))
       '@hashgraph/proto': 2.25.0(ansi-regex@6.2.2)(ansi-styles@6.2.3)(debug@4.4.3)(protobufjs@7.5.4)(strip-ansi@7.1.2)
@@ -9122,9 +9122,9 @@ snapshots:
       '@adraffy/ens-normalize': 1.11.1
       '@noble/curves': 1.9.7
       '@noble/hashes': 1.8.0
-      '@scure/bip32': 1.6.2
-      '@scure/bip39': 1.5.4
-      abitype: 1.0.8(typescript@5.9.3)(zod@3.25.76)
+      '@scure/bip32': 1.7.0
+      '@scure/bip39': 1.6.0
+      abitype: 1.2.3(typescript@5.9.3)(zod@3.25.76)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 5.9.3
@@ -9561,7 +9561,7 @@ snapshots:
       '@types/uuid': 10.0.0
       '@types/ws': 8.18.1
       buffer: 6.0.3
-      eventemitter3: 5.0.1
+      eventemitter3: 5.0.4
       uuid: 11.1.0
       ws: 8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     optionalDependencies:

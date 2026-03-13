@@ -8,7 +8,7 @@ No-stubs MCP server that bridges MCP tools to the HOL Registry Broker using `@ha
    - `pnpm install`
 2. Configure env:
    - `cp .env.example .env`
-   - set `REGISTRY_BROKER_API_KEY` for paid flows
+   - set `REGISTRY_BROKER_API_KEY` for paid flows, or configure ledger auth with `LEDGER_ACCOUNT_ID`/`HEDERA_ACCOUNT_ID` plus the matching network and private key
 3. Run transports:
    - HTTP: `pnpm dev:http`
    - stdio: `pnpm dev:stdio`
@@ -21,6 +21,10 @@ Once this package is published, you can launch it directly with `npx`:
 - stdio: `REGISTRY_BROKER_API_KEY=... npx @hol-org/hashnet-mcp --stdio`
 - HTTP: `REGISTRY_BROKER_API_KEY=... npx @hol-org/hashnet-mcp --http --host 127.0.0.1 --port 3333`
 - help: `npx @hol-org/hashnet-mcp --help`
+
+Ledger-auth launches use the same binary and env-based credentials:
+
+- stdio: `LEDGER_ACCOUNT_ID=0.0.12345 HEDERA_NETWORK=hedera:testnet HEDERA_PRIVATE_KEY=... npx @hol-org/hashnet-mcp --stdio`
 
 When installed globally or linked locally, the binary name is `hashnet-mcp`.
 
@@ -60,7 +64,7 @@ Supported CLI flags:
 - Discovery: `hol.stats`, `hol.capabilities`, `hol.search`, `hol.vectorSearch`, `hol.resolveUaid`
 - Chat: `hol.chat.createSession`, `hol.chat.sendMessage`, `hol.chat.history`, `hol.chat.end`
 - Registration: `hol.getRegistrationQuote`, `hol.registerAgent`, `hol.waitForRegistrationCompletion`
-- Workflows: `workflow.discovery`, `workflow.registration`
+- Workflows: `workflow.discovery`, `workflow.delegate`, `workflow.registration`
 
 All tools now return a structured success envelope in `structuredContent`:
 
@@ -90,7 +94,7 @@ Tool failures return `isError: true` plus a structured error envelope with machi
 | Variable | Required | Notes |
 |---|---|---|
 | `REGISTRY_BROKER_API_URL` | no | defaults to `https://hol.org/registry/api/v1` |
-| `REGISTRY_BROKER_API_KEY` | no | required for paid tools (chat/registration) |
+| `REGISTRY_BROKER_API_KEY` | no | enables paid tools with a static broker API key |
 | `BROKER_REQUEST_TIMEOUT_MS` | no | default upstream request timeout is `15000` |
 | `MCP_TRANSPORT` | no | `http` (default) or `stdio` |
 | `MCP_HOST` | no | defaults to `127.0.0.1` |
@@ -100,6 +104,12 @@ Tool failures return `isError: true` plus a structured error envelope with machi
 | `MCP_SESSION_IDLE_TTL_MS` | no | idle HTTP session timeout, defaults to `900000` |
 | `MCP_SESSION_MAX_COUNT` | no | maximum active HTTP sessions, defaults to `250` |
 | `MCP_SESSION_REAP_INTERVAL_MS` | no | idle session reap interval, defaults to `60000` |
+| `LEDGER_ACCOUNT_ID` | no | generic ledger identity used for ledger-auth flows; falls back to `HEDERA_ACCOUNT_ID` |
+| `HEDERA_ACCOUNT_ID` | no | Hedera account id for ledger auth and backwards compatibility |
+| `HEDERA_NETWORK` | no | Hedera ledger network, for example `hedera:testnet` |
+| `HEDERA_PRIVATE_KEY` | no | Hedera private key for broker ledger auth |
+| `EVM_LEDGER_NETWORK` | no | EVM CAIP-2 network id, for example `eip155:1` |
+| `ETH_PK` | no | EVM private key for broker ledger auth |
 
 ## No-Stubs Validation
 

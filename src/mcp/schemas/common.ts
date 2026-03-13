@@ -4,6 +4,15 @@ const metadataValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 
 export const jsonRecordSchema = z.record(z.string(), z.unknown());
 export const emptyInputSchema = z.object({});
+export const agentAuthConfigSchema = z.object({
+  type: z.enum(["bearer", "basic", "header", "apiKey"]).optional(),
+  token: z.string().optional(),
+  username: z.string().optional(),
+  password: z.string().optional(),
+  headerName: z.string().optional(),
+  headerValue: z.string().optional(),
+  headers: z.record(z.string(), z.string()).optional(),
+});
 export const toolResultMetaSchema = z.object({
   schemaVersion: z.number().int().positive(),
   summary: z.string(),
@@ -85,6 +94,7 @@ export const holResolveUaidInputSchema = z.object({
 export const holChatCreateSessionInputSchema = z.object({
   uaid: z.string().optional(),
   agentUrl: z.string().optional(),
+  auth: agentAuthConfigSchema.optional(),
   senderUaid: z.string().optional(),
   historyTtlSeconds: z.number().int().positive().optional(),
   encryptionRequested: z.boolean().optional(),
@@ -94,6 +104,7 @@ export const holChatSendMessageInputSchema = z.object({
   sessionId: z.string().optional(),
   uaid: z.string().optional(),
   agentUrl: z.string().optional(),
+  auth: agentAuthConfigSchema.optional(),
   senderUaid: z.string().optional(),
   historyTtlSeconds: z.number().int().positive().optional(),
   encryptionRequested: z.boolean().optional(),
@@ -142,6 +153,20 @@ export const workflowRegistrationInputSchema = z.object({
   wait: z.boolean().default(true),
   timeoutMs: z.number().int().positive().optional(),
   pollIntervalMs: z.number().int().positive().optional(),
+});
+
+export const workflowDelegateInputSchema = z.object({
+  task: z.string().min(1),
+  query: z.string().optional(),
+  uaid: z.string().optional(),
+  agentUrl: z.string().optional(),
+  limit: z.number().int().min(1).max(20).optional(),
+  filters: workflowDiscoveryFiltersSchema.optional(),
+  auth: agentAuthConfigSchema.optional(),
+  senderUaid: z.string().optional(),
+  historyTtlSeconds: z.number().int().positive().optional(),
+  encryptionRequested: z.boolean().optional(),
+  streaming: z.boolean().optional(),
 });
 
 export const holSearchOutputSchema = successEnvelopeSchema(
@@ -238,6 +263,25 @@ export const workflowRegistrationOutputSchema = successEnvelopeSchema(
   }),
 );
 
+export const workflowDelegateOutputSchema = successEnvelopeSchema(
+  z.object({
+    task: z.string(),
+    query: z.string(),
+    candidateCount: z.number().int().nonnegative(),
+    selectedAgent: z.object({
+      uaid: z.string().optional(),
+      name: z.string().optional(),
+      description: z.string().optional(),
+      registry: z.string().optional(),
+      agentUrl: z.string().optional(),
+      score: z.number().optional(),
+    }),
+    session: jsonRecordSchema,
+    response: jsonRecordSchema,
+    search: jsonRecordSchema.optional(),
+  }),
+);
+
 export const holCapabilitiesOutputSchema = successEnvelopeSchema(
   z.object({
     server: z.object({
@@ -251,6 +295,9 @@ export const holCapabilitiesOutputSchema = successEnvelopeSchema(
     }),
     auth: z.object({
       brokerApiKeyConfigured: z.boolean(),
+      ledgerAuthConfigured: z.boolean(),
+      ledgerAuthMode: z.enum(["none", "hedera", "evm"]),
+      paidToolAuthAvailable: z.boolean(),
       httpBearerRequired: z.boolean(),
     }),
     limits: z.object({

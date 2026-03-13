@@ -203,6 +203,7 @@ describe("MCP HTTP tool calls", () => {
       "hol.getRegistrationQuote",
       "hol.registerAgent",
       "hol.waitForRegistrationCompletion",
+      "workflow.delegate",
       "workflow.discovery",
       "workflow.registration",
     ];
@@ -249,6 +250,157 @@ describe("MCP HTTP tool calls", () => {
     expect(stats.payload.result?.isError).not.toBe(true);
     expect(stats.payload.result?.structuredContent?.ok).toBe(true);
     expect(stats.payload.result?.structuredContent?.data?.stats?.totalAgents).toBe(42);
+  });
+
+  test("delegates a task end to end with cached ledger auth when no broker API key is configured", async () => {
+    const BrokerCtor = (standardsSdk as Record<string, unknown>).RegistryBrokerClient as {
+      prototype: Record<string, unknown>;
+    };
+
+    const authenticateSpy = vi
+      .spyOn(
+        BrokerCtor.prototype as {
+          authenticateWithLedgerCredentials: () => Promise<unknown>;
+        },
+        "authenticateWithLedgerCredentials",
+      )
+      .mockResolvedValue({
+        key: "issued-ledger-key",
+        accountId: "0.0.12345",
+        network: "hedera:testnet",
+        apiKey: {
+          id: "api-key-1",
+          prefix: "issued",
+          lastFour: "1234",
+          createdAt: "2026-03-13T00:00:00.000Z",
+        },
+      });
+    vi.spyOn(BrokerCtor.prototype as { search: () => Promise<unknown> }, "search").mockResolvedValue({
+      hits: [
+        {
+          uaid: "uaid:delegate-1",
+          name: "Registry Reviewer",
+          description: "Reviews TypeScript changes",
+          registry: "hashgraph-online",
+          endpoint: "https://delegate.example.com/mcp",
+          score: 0.99,
+        },
+      ],
+    });
+    vi.spyOn(BrokerCtor.prototype as { createSession: () => Promise<unknown> }, "createSession").mockResolvedValue({
+      sessionId: "session-123",
+    });
+    vi.spyOn(BrokerCtor.prototype as { sendMessage: () => Promise<unknown> }, "sendMessage").mockResolvedValue({
+      messageId: "message-1",
+      accepted: true,
+    });
+
+    const port = 3650 + Math.floor(Math.random() * 300);
+    const env: EnvConfig = {
+      registryBrokerApiUrl: "https://example.com/registry/api/v1",
+      registryBrokerApiKey: undefined,
+      brokerRequestTimeoutMs: 10_000,
+      mcpTransport: "http",
+      mcpHost: "127.0.0.1",
+      mcpPort: port,
+      mcpAllowedOrigins: ["http://localhost:*", "http://127.0.0.1:*"],
+      mcpServerBearerToken: undefined,
+      mcpSessionIdleTtlMs: 60_000,
+      mcpSessionMaxCount: 10,
+      mcpSessionReapIntervalMs: 1_000,
+      logLevel: "silent",
+      brokerRateLimitConcurrency: 5,
+      brokerRateLimitMinTimeMs: 1,
+      ledgerAccountId: "0.0.12345",
+      hederaNetwork: "hedera:testnet",
+      hederaAccountId: "0.0.12345",
+      hederaPrivateKey: "302e020100300506032b657004220420fakeprivatekeyfakeprivatekeyfakep",
+      evmLedgerNetwork: undefined,
+      ethPrivateKey: undefined,
+      rbEncryptionPrivateKey: undefined,
+    };
+
+    const flags = {
+      featureLegacySse: false,
+      featureMemorySqlite: false,
+      featureMemoryRedis: false,
+      featureLedgerAuth: false,
+      featureEncryptedChat: false,
+    };
+
+    const logger = createLogger({ logLevel: "silent" });
+    rateLimiter = createBrokerRateLimiter(env);
+
+    const createServer = () =>
+      createMcpServer({
+        env,
+        flags,
+        logger,
+        rateLimiter: rateLimiter!,
+      });
+
+    running = await runStreamableHttp({ env, flags, logger, createServer });
+    const url = `http://${env.mcpHost}:${env.mcpPort}/mcp`;
+
+    const initialize = await postJson(
+      url,
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion,
+          capabilities: { tools: {}, logging: {} },
+          clientInfo: { name: "integration-test", version: "0.1.0" },
+        },
+      },
+      {
+        "mcp-protocol-version": protocolVersion,
+      },
+    );
+
+    expect(initialize.payload.error).toBeUndefined();
+    const sessionId = initialize.response.headers.get("mcp-session-id");
+    expect(sessionId).toBeTruthy();
+
+    const delegate = await postJson(
+      url,
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: {
+          name: "workflow.delegate",
+          arguments: {
+            task: "Review the pending TypeScript changes for regressions.",
+            query: "typescript code review specialist",
+            limit: 3,
+          },
+        },
+      },
+      {
+        "mcp-session-id": String(sessionId),
+        "mcp-protocol-version": protocolVersion,
+      },
+    );
+
+    expect(delegate.payload.error).toBeUndefined();
+    expect(delegate.payload.result?.isError).not.toBe(true);
+    expect(delegate.payload.result?.structuredContent?.ok).toBe(true);
+
+    const delegateData = delegate.payload.result?.structuredContent?.data as
+      | {
+          candidateCount?: number;
+          selectedAgent?: { uaid?: string; name?: string };
+          session?: { sessionId?: string };
+        }
+      | undefined;
+
+    expect(delegateData?.candidateCount).toBe(1);
+    expect(delegateData?.selectedAgent?.uaid).toBe("uaid:delegate-1");
+    expect(delegateData?.selectedAgent?.name).toBe("Registry Reviewer");
+    expect(delegateData?.session?.sessionId).toBe("session-123");
+    expect(authenticateSpy).toHaveBeenCalledTimes(1);
   });
 
   test("returns 429 when the streamable HTTP request budget is exhausted", async () => {

@@ -28,7 +28,7 @@ export function registerRegistrationTools(server: McpServer, ctx: ToolRegisterCo
       return executeTool(ctx, extra, {
         toolName: "hol.getRegistrationQuote",
         run: async (traceId) => ({
-          quote: await ctx.withBroker(traceId, "getRegistrationQuote", (client) =>
+          quote: await ctx.withBrokerAuth(traceId, "getRegistrationQuote", (client) =>
             client.getRegistrationQuote(args as Record<string, unknown>),
           ),
         }),
@@ -54,7 +54,7 @@ export function registerRegistrationTools(server: McpServer, ctx: ToolRegisterCo
       return executeTool(ctx, extra, {
         toolName: "hol.registerAgent",
         run: async (traceId) => ({
-          registration: await ctx.withBroker(traceId, "registerAgent", (client) =>
+          registration: await ctx.withBrokerAuth(traceId, "registerAgent", (client) =>
             client.registerAgent(args as Record<string, unknown>),
           ),
         }),
@@ -81,7 +81,7 @@ export function registerRegistrationTools(server: McpServer, ctx: ToolRegisterCo
         toolName: "hol.waitForRegistrationCompletion",
         run: async (traceId) => ({
           attemptId: args.attemptId,
-          progress: await ctx.withBroker(traceId, "waitForRegistrationCompletion", (client) =>
+          progress: await ctx.withBrokerAuth(traceId, "waitForRegistrationCompletion", (client) =>
             client.waitForRegistrationCompletion(args.attemptId, {
               intervalMs: args.pollIntervalMs,
               timeoutMs: args.timeoutMs,

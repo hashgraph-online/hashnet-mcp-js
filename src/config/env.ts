@@ -17,6 +17,7 @@ export interface EnvConfig {
   logLevel: string;
   brokerRateLimitConcurrency: number;
   brokerRateLimitMinTimeMs: number;
+  ledgerAccountId?: string;
   hederaNetwork?: string;
   hederaAccountId?: string;
   hederaPrivateKey?: string;
@@ -40,6 +41,7 @@ interface UnsafeEnvView extends Record<string, string | number | string[] | unde
   LOG_LEVEL: string;
   BROKER_RATE_LIMIT_CONCURRENCY: number;
   BROKER_RATE_LIMIT_MIN_TIME_MS: number;
+  LEDGER_ACCOUNT_ID?: string;
   HEDERA_NETWORK?: string;
   HEDERA_ACCOUNT_ID?: string;
   HEDERA_PRIVATE_KEY?: string;
@@ -132,6 +134,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): EnvConfig {
       100,
       "BROKER_RATE_LIMIT_MIN_TIME_MS",
     ),
+    LEDGER_ACCOUNT_ID: normalizeOptionalSecret(source.LEDGER_ACCOUNT_ID),
     HEDERA_NETWORK: normalizeOptionalSecret(source.HEDERA_NETWORK),
     HEDERA_ACCOUNT_ID: normalizeOptionalSecret(source.HEDERA_ACCOUNT_ID),
     HEDERA_PRIVATE_KEY: normalizeOptionalSecret(source.HEDERA_PRIVATE_KEY),
@@ -165,6 +168,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): EnvConfig {
     logLevel: envView.LOG_LEVEL,
     brokerRateLimitConcurrency: envView.BROKER_RATE_LIMIT_CONCURRENCY,
     brokerRateLimitMinTimeMs: envView.BROKER_RATE_LIMIT_MIN_TIME_MS,
+    ledgerAccountId: envView.LEDGER_ACCOUNT_ID ?? envView.HEDERA_ACCOUNT_ID,
     hederaNetwork: envView.HEDERA_NETWORK,
     hederaAccountId: envView.HEDERA_ACCOUNT_ID,
     hederaPrivateKey: envView.HEDERA_PRIVATE_KEY,
@@ -194,6 +198,7 @@ export function redactEnvForLogs(env: EnvConfig): Record<string, unknown> {
     logLevel: env.logLevel,
     brokerRateLimitConcurrency: env.brokerRateLimitConcurrency,
     brokerRateLimitMinTimeMs: env.brokerRateLimitMinTimeMs,
+    ledgerAccountId: env.ledgerAccountId,
     hederaNetwork: env.hederaNetwork,
     hederaAccountId: env.hederaAccountId,
     hederaPrivateKey: redact(env.hederaPrivateKey),

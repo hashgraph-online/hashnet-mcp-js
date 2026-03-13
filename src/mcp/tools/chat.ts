@@ -38,6 +38,7 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
       }
 
       const payload: Record<string, unknown> = {
+        auth: args.auth,
         senderUaid: args.senderUaid,
         historyTtlSeconds: args.historyTtlSeconds,
         encryptionRequested: args.encryptionRequested,
@@ -52,7 +53,7 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
       return executeTool(ctx, extra, {
         toolName: "hol.chat.createSession",
         run: async (traceId) => ({
-          session: await ctx.withBroker(traceId, "createSession", (client) => client.createSession(payload)),
+          session: await ctx.withBrokerAuth(traceId, "createSession", (client) => client.createSession(payload)),
         }),
         summary: () => "Created HOL chat session.",
       });
@@ -92,6 +93,7 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
 
           if (!sessionId) {
             const createPayload: Record<string, unknown> = {
+              auth: args.auth,
               senderUaid: args.senderUaid,
               historyTtlSeconds: args.historyTtlSeconds,
               encryptionRequested: args.encryptionRequested,
@@ -103,7 +105,7 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
               createPayload.agentUrl = args.agentUrl;
             }
 
-            const created = await ctx.withBroker(traceId, "createSession", (client) =>
+            const created = await ctx.withBrokerAuth(traceId, "createSession", (client) =>
               client.createSession(createPayload),
             );
             sessionId = created.sessionId;
@@ -111,11 +113,12 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
 
           return {
             sessionId,
-            response: await ctx.withBroker(traceId, "sendMessage", (client) =>
+            response: await ctx.withBrokerAuth(traceId, "sendMessage", (client) =>
               client.sendMessage({
                 sessionId,
                 message: args.message,
                 streaming: args.streaming,
+                auth: args.auth,
               }),
             ),
           };
@@ -143,7 +146,7 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
         toolName: "hol.chat.history",
         run: async (traceId) => ({
           sessionId: args.sessionId,
-          history: await ctx.withBroker(traceId, "fetchHistorySnapshot", (client) =>
+          history: await ctx.withBrokerAuth(traceId, "fetchHistorySnapshot", (client) =>
             client.fetchHistorySnapshot(args.sessionId, { decrypt: false }),
           ),
         }),
@@ -169,7 +172,7 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
       return executeTool(ctx, extra, {
         toolName: "hol.chat.end",
         run: async (traceId) => {
-          await ctx.withBroker(traceId, "endSession", (client) => client.endSession(args.sessionId));
+          await ctx.withBrokerAuth(traceId, "endSession", (client) => client.endSession(args.sessionId));
           return {
             sessionId: args.sessionId,
             ended: true,

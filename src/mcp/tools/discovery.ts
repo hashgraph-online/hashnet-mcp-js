@@ -17,6 +17,8 @@ import { errorResult } from "./result.js";
 import type { ToolRegisterContext } from "./types.js";
 
 export function registerDiscoveryTools(server: McpServer, ctx: ToolRegisterContext): void {
+  const ledgerAuthFeatureEnabled = ctx.flags.featureLedgerAuth || ctx.authAvailability.ledgerAuthConfigured;
+
   server.registerTool(
     "hol.stats",
     {
@@ -102,7 +104,7 @@ export function registerDiscoveryTools(server: McpServer, ctx: ToolRegisterConte
 
           return {
             query: args.query,
-            count: Array.isArray(results.results) ? results.results.length : 0,
+            count: Array.isArray(results.hits) ? results.hits.length : 0,
             results,
           };
         },
@@ -152,7 +154,10 @@ export function registerDiscoveryTools(server: McpServer, ctx: ToolRegisterConte
             legacySse: ctx.flags.featureLegacySse,
           },
           auth: {
-            brokerApiKeyConfigured: Boolean(ctx.env.registryBrokerApiKey),
+            brokerApiKeyConfigured: ctx.authAvailability.brokerApiKeyConfigured,
+            ledgerAuthConfigured: ctx.authAvailability.ledgerAuthConfigured,
+            ledgerAuthMode: ctx.authAvailability.ledgerAuthMode,
+            paidToolAuthAvailable: ctx.authAvailability.paidToolAuthAvailable,
             httpBearerRequired: Boolean(ctx.env.mcpServerBearerToken),
           },
           limits: {
@@ -166,7 +171,7 @@ export function registerDiscoveryTools(server: McpServer, ctx: ToolRegisterConte
             legacySse: ctx.flags.featureLegacySse,
             memorySqlite: ctx.flags.featureMemorySqlite,
             memoryRedis: ctx.flags.featureMemoryRedis,
-            ledgerAuth: ctx.flags.featureLedgerAuth,
+            ledgerAuth: ledgerAuthFeatureEnabled,
             encryptedChat: ctx.flags.featureEncryptedChat,
           },
         }),

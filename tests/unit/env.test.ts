@@ -25,12 +25,22 @@ describe("env loader", () => {
   test("redaction hides secrets", () => {
     const env = loadEnv({
       REGISTRY_BROKER_API_KEY: "secret",
+      LEDGER_ACCOUNT_ID: "0.0.12345",
       MCP_SERVER_BEARER_TOKEN: "token",
     });
 
     const redacted = redactEnvForLogs(env);
     expect(redacted.registryBrokerApiKey).toBe("***REDACTED***");
+    expect(redacted.ledgerAccountId).toBe("0.0.12345");
     expect(redacted.mcpServerBearerToken).toBe("***REDACTED***");
+  });
+
+  test("ledger account id falls back to HEDERA_ACCOUNT_ID when not provided explicitly", () => {
+    const env = loadEnv({
+      HEDERA_ACCOUNT_ID: "0.0.54321",
+    });
+
+    expect(env.ledgerAccountId).toBe("0.0.54321");
   });
 
   test("local host helper", () => {

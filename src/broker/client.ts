@@ -4,9 +4,6 @@ import { Agent } from "undici";
 import type { EnvConfig } from "../config/env.js";
 import { SERVER_NAME } from "../constants.js";
 
-const RegistryBrokerClientCtor = (standardsSdk as Record<string, unknown>).RegistryBrokerClient as new (
-  options: Record<string, unknown>,
-) => RegistryBrokerClientLike;
 const sharedDispatcher = new Agent({
   keepAliveTimeout: 10_000,
   keepAliveMaxTimeout: 60_000,
@@ -15,31 +12,82 @@ const sharedDispatcher = new Agent({
 
 type BrokerFetch = typeof fetch;
 
+export interface LedgerAuthenticationLoggerLike {
+  info?: (message: string) => void;
+}
+
+export interface LedgerAuthenticationSignerResultLike {
+  signature: string;
+  signatureKind?: string;
+  publicKey?: string;
+}
+
+export interface LedgerCredentialAuthOptionsLike {
+  accountId: string;
+  network: string;
+  signer?: unknown;
+  sign?: (
+    message: string,
+  ) => LedgerAuthenticationSignerResultLike | Promise<LedgerAuthenticationSignerResultLike>;
+  hederaPrivateKey?: string;
+  evmPrivateKey?: string;
+  expiresInMinutes?: number;
+  setAccountHeader?: boolean;
+  label?: string;
+  logger?: LedgerAuthenticationLoggerLike;
+}
+
+export interface LedgerVerifyResponseLike extends Record<string, unknown> {
+  key: string;
+  accountId: string;
+  network: string;
+  apiKey: {
+    prefix: string;
+    lastFour: string;
+  } & Record<string, unknown>;
+}
+
 export type RegistryBrokerClientLike = {
-  setDefaultHeader?: (name: string, value?: string | null) => void;
-  stats: () => Promise<Record<string, unknown>>;
-  search: (params?: Record<string, unknown>) => Promise<{ hits?: Array<Record<string, unknown>> } & Record<string, unknown>>;
-  vectorSearch: (
-    request: Record<string, unknown>,
-  ) => Promise<{ results?: Array<Record<string, unknown>> } & Record<string, unknown>>;
-  resolveUaid: (uaid: string) => Promise<Record<string, unknown>>;
-  createSession: (payload: Record<string, unknown>) => Promise<{ sessionId: string } & Record<string, unknown>>;
-  sendMessage: (payload: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  getDefaultHeaders?: () => Record<string, string>;
+  setDefaultHeader: (name: string, value?: string | null) => void;
+  setLedgerApiKey: (apiKey?: string) => void;
+  authenticateWithLedgerCredentials: (
+    options: LedgerCredentialAuthOptionsLike,
+  ) => Promise<LedgerVerifyResponseLike>;
+  createSession: (
+    payload: Record<string, unknown>,
+  ) => Promise<{ sessionId: string } & Record<string, unknown>>;
+  endSession: (sessionId: string) => Promise<void>;
   fetchHistorySnapshot: (
     sessionId: string,
     options?: Record<string, unknown>,
   ) => Promise<Record<string, unknown>>;
-  endSession: (sessionId: string) => Promise<void>;
   getRegistrationQuote: (payload: Record<string, unknown>) => Promise<Record<string, unknown>>;
   registerAgent: (payload: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  resolveUaid: (uaid: string) => Promise<Record<string, unknown>>;
+  search: (params?: Record<string, unknown>) => Promise<{ hits?: Array<Record<string, unknown>> } & Record<string, unknown>>;
+  sendMessage: (payload: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  stats: () => Promise<Record<string, unknown>>;
+  vectorSearch: (
+    request: Record<string, unknown>,
+  ) => Promise<{ hits?: Array<Record<string, unknown>> } & Record<string, unknown>>;
   waitForRegistrationCompletion: (
     attemptId: string,
     options?: Record<string, unknown>,
   ) => Promise<Record<string, unknown>>;
 };
 
+type BrokerClientEnv = Pick<
+  EnvConfig,
+  "registryBrokerApiUrl" | "registryBrokerApiKey" | "brokerRequestTimeoutMs"
+>;
+
+const RegistryBrokerClientCtor = (standardsSdk as Record<string, unknown>).RegistryBrokerClient as new (
+  options: Record<string, unknown>,
+) => RegistryBrokerClientLike;
+
 export function createRegistryBrokerClient(
-  env: Pick<EnvConfig, "registryBrokerApiUrl" | "registryBrokerApiKey" | "brokerRequestTimeoutMs">,
+  env: BrokerClientEnv,
   traceId: string,
 ): RegistryBrokerClientLike {
   return new RegistryBrokerClientCtor({

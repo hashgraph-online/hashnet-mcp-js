@@ -14,6 +14,20 @@ interface JsonRpcResponse {
 
 const protocolVersion = "2025-06-18";
 
+function paidToolAuthAvailable(payload: JsonRpcResponse): boolean {
+  const structuredContent = payload.result?.structuredContent as
+    | {
+        data?: {
+          auth?: {
+            paidToolAuthAvailable?: boolean;
+          };
+        };
+      }
+    | undefined;
+
+  return structuredContent?.data?.auth?.paidToolAuthAvailable === true;
+}
+
 function terminateProcessTree(child: ChildProcess): void {
   if (!child.pid) {
     return;
@@ -161,9 +175,21 @@ async function run(): Promise<void> {
     const toolsList = await postJson(baseUrl, toolsListBody, callHeaders);
     assertJsonRpcOk(toolsList.payload, "tools/list");
 
-    const statsBody = {
+    const capabilitiesBody = {
       jsonrpc: "2.0",
       id: 3,
+      method: "tools/call",
+      params: {
+        name: "hol.capabilities",
+        arguments: {},
+      },
+    };
+    const capabilities = await postJson(baseUrl, capabilitiesBody, callHeaders);
+    assertJsonRpcOk(capabilities.payload, "tools/call hol.capabilities");
+
+    const statsBody = {
+      jsonrpc: "2.0",
+      id: 4,
       method: "tools/call",
       params: {
         name: "hol.stats",
@@ -175,7 +201,7 @@ async function run(): Promise<void> {
 
     const searchBody = {
       jsonrpc: "2.0",
-      id: 4,
+      id: 5,
       method: "tools/call",
       params: {
         name: "hol.search",
@@ -191,7 +217,7 @@ async function run(): Promise<void> {
 
     const vectorSearchBody = {
       jsonrpc: "2.0",
-      id: 5,
+      id: 6,
       method: "tools/call",
       params: {
         name: "hol.vectorSearch",
@@ -203,6 +229,24 @@ async function run(): Promise<void> {
     };
     const vectorSearch = await postJson(baseUrl, vectorSearchBody, callHeaders);
     assertJsonRpcOk(vectorSearch.payload, "tools/call hol.vectorSearch");
+
+    if (paidToolAuthAvailable(capabilities.payload)) {
+      const delegateBody = {
+        jsonrpc: "2.0",
+        id: 7,
+        method: "tools/call",
+        params: {
+          name: "workflow.delegate",
+          arguments: {
+            task: "Summarize the strongest candidate for customer support automation.",
+            query: "customer support automation specialist",
+            limit: 3,
+          },
+        },
+      };
+      const delegate = await postJson(baseUrl, delegateBody, callHeaders);
+      assertJsonRpcOk(delegate.payload, "tools/call workflow.delegate");
+    }
 
     process.stdout.write("HTTP smoke passed\n");
   } finally {

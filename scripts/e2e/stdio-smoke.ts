@@ -11,6 +11,22 @@ type JsonRpcEnvelope = {
   error?: { code: number; message: string };
 };
 
+function paidToolAuthAvailable(envelope: JsonRpcEnvelope): boolean {
+  const structuredContent = envelope.result?.structuredContent as
+    | {
+        data?: {
+          auth?: {
+            paidToolAuthAvailable?: boolean;
+          };
+        };
+      }
+    | undefined;
+
+  return structuredContent?.data?.auth?.paidToolAuthAvailable === true;
+}
+
+const requestTimeoutMs = Number(process.env.SMOKE_STDIO_TIMEOUT_MS ?? 25_000);
+
 function terminateProcessTree(child: ChildProcess): void {
   if (!child.pid) {
     return;
@@ -112,7 +128,7 @@ async function run(): Promise<void> {
           pending.delete(id);
           reject(new Error(`request timeout for ${method} (id=${id})`));
         }
-      }, 15000);
+      }, requestTimeoutMs);
     });
   }
 
@@ -135,6 +151,12 @@ async function run(): Promise<void> {
     const toolsList = await sendRequest("tools/list", {});
     assertOk(toolsList, "tools/list");
 
+    const capabilities = await sendRequest("tools/call", {
+      name: "hol.capabilities",
+      arguments: {},
+    });
+    assertOk(capabilities, "tools/call hol.capabilities");
+
     const stats = await sendRequest("tools/call", {
       name: "hol.stats",
       arguments: {},
@@ -150,6 +172,18 @@ async function run(): Promise<void> {
       },
     });
     assertOk(search, "tools/call hol.search");
+
+    if (paidToolAuthAvailable(capabilities)) {
+      const delegate = await sendRequest("tools/call", {
+        name: "workflow.delegate",
+        arguments: {
+          task: "Summarize the strongest candidate for customer support automation.",
+          query: "customer support automation specialist",
+          limit: 3,
+        },
+      });
+      assertOk(delegate, "tools/call workflow.delegate");
+    }
 
     process.stdout.write("stdio smoke passed\n");
   } catch (error) {

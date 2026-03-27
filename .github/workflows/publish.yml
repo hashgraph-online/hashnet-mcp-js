@@ -83,10 +83,23 @@ jobs:
         run: |
           set -euo pipefail
           tag="v${{ steps.publish_check.outputs.version }}"
-          if git ls-remote --tags origin "refs/tags/${tag}" | grep -q "${tag}"; then
-            echo "Tag ${tag} already exists; skipping tag creation."
+
+          # Resolve the commit SHA for an existing remote tag (annotated or lightweight).
+          remote_sha="$(git ls-remote --tags origin "refs/tags/${tag}^{}" | awk 'NR==1 {print $1}')"
+          if [ -z "${remote_sha}" ]; then
+            remote_sha="$(git ls-remote --tags origin "refs/tags/${tag}" | awk 'NR==1 {print $1}')"
+          fi
+
+          if [ -n "${remote_sha}" ]; then
+            if [ "${remote_sha}" != "${GITHUB_SHA}" ]; then
+              echo "Tag ${tag} already exists on ${remote_sha}, expected ${GITHUB_SHA}." >&2
+              echo "Refusing to proceed because release source and artifact would diverge." >&2
+              exit 1
+            fi
+            echo "Tag ${tag} already points to ${GITHUB_SHA}; skipping tag creation."
             exit 0
           fi
+
           git tag "${tag}" "${GITHUB_SHA}"
           git push origin "${tag}"
 
@@ -106,9 +119,7 @@ jobs:
             gh release create "${tag}" \
               --title "${tag}" \
               --target "${GITHUB_SHA}" \
-              --generate-notes \
-              --notes "${release_notes}"
-            exit 0
+              --generate-notes
           fi
 
           body="$(gh release view "${tag}" --json body --jq '.body // \"\"')"

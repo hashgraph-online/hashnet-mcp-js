@@ -80,7 +80,7 @@ Tool failures return `isError: true` with structured machine-readable error fiel
 | `MCP_HOST` | no | defaults to `127.0.0.1` |
 | `MCP_PORT` | no | defaults to `3333` |
 | `MCP_ALLOWED_ORIGINS` | no | comma-separated allow list |
-| `MCP_SERVER_BEARER_TOKEN` | no | recommended when binding non-local host |
+| `MCP_SERVER_BEARER_TOKEN` | no | required when binding to a non-local host (for example `0.0.0.0`) |
 | `MCP_SESSION_IDLE_TTL_MS` | no | defaults to `900000` |
 | `MCP_SESSION_MAX_COUNT` | no | defaults to `250` |
 | `MCP_SESSION_REAP_INTERVAL_MS` | no | defaults to `60000` |
@@ -95,7 +95,7 @@ Tool failures return `isError: true` with structured machine-readable error fiel
 
 - Binds to `127.0.0.1` by default.
 - Validates `Origin` for HTTP requests when present.
-- Supports optional HTTP bearer-token gate.
+- Enforces bearer-token auth when binding to non-local hosts.
 - Reaps idle HTTP sessions and enforces max active sessions.
 - Redacts sensitive values in logs.
 

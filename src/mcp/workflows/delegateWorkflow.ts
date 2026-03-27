@@ -93,6 +93,20 @@ function notFoundError(message: string): Error & { status: number } {
   return error;
 }
 
+function statusValue(error: unknown): number | undefined {
+  if (!error || typeof error !== "object" || !("status" in error)) {
+    return undefined;
+  }
+
+  const status = (error as { status?: unknown }).status;
+  return typeof status === "number" ? status : undefined;
+}
+
+function shouldContinueAfterCreateSessionFailure(error: unknown): boolean {
+  const status = statusValue(error);
+  return status === 404;
+}
+
 export function registerDelegateWorkflow(server: McpServer, ctx: ToolRegisterContext): void {
   server.registerTool(
     "workflow.delegate",
@@ -240,7 +254,10 @@ export function registerDelegateWorkflow(server: McpServer, ctx: ToolRegisterCon
                 extra.sessionId,
               );
               session = undefined;
-              continue;
+              if (shouldContinueAfterCreateSessionFailure(error)) {
+                continue;
+              }
+              break;
             }
 
             const sessionId = stringValue(session.sessionId);

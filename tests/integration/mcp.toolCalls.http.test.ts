@@ -315,7 +315,7 @@ describe("MCP HTTP tool calls", () => {
       ],
     });
     vi.spyOn(BrokerCtor.prototype as { createSession: () => Promise<unknown> }, "createSession")
-      .mockRejectedValueOnce(new Error("upstream timeout"))
+      .mockRejectedValueOnce(Object.assign(new Error("agent unavailable"), { status: 404 }))
       .mockResolvedValue({
         sessionId: "session-123",
       });
@@ -430,6 +430,157 @@ describe("MCP HTTP tool calls", () => {
     expect(delegateData?.selectedAgent?.name).toBe("Registry Reviewer");
     expect(delegateData?.session?.sessionId).toBe("session-123");
     expect(authenticateSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test("does not retry a different candidate after generic createSession failure", async () => {
+    const BrokerCtor = (standardsSdk as Record<string, unknown>).RegistryBrokerClient as {
+      prototype: Record<string, unknown>;
+    };
+
+    vi.spyOn(
+      BrokerCtor.prototype as {
+        authenticateWithLedgerCredentials: () => Promise<unknown>;
+      },
+      "authenticateWithLedgerCredentials",
+    ).mockResolvedValue({
+      key: "issued-ledger-key",
+      accountId: "0.0.12345",
+      network: "hedera:testnet",
+      apiKey: {
+        id: "api-key-1",
+        prefix: "issued",
+        lastFour: "1234",
+        createdAt: "2026-03-13T00:00:00.000Z",
+      },
+    });
+    vi.spyOn(BrokerCtor.prototype as { search: () => Promise<unknown> }, "search").mockResolvedValue({
+      hits: [
+        {
+          uaid: "uaid:delegate-1",
+          name: "Primary Candidate",
+          description: "Reviews TypeScript changes",
+          registry: "hashgraph-online",
+          endpoint: "https://delegate.example.com/mcp",
+          score: 0.99,
+          available: true,
+          communicationSupported: true,
+          routingSupported: true,
+        },
+        {
+          uaid: "uaid:delegate-2",
+          name: "Registry Reviewer",
+          description: "Reviews TypeScript changes",
+          registry: "hashgraph-online",
+          endpoint: "https://delegate-2.example.com/mcp",
+          score: 0.88,
+          available: false,
+          communicationSupported: true,
+          routingSupported: true,
+        },
+      ],
+    });
+    const createSessionSpy = vi
+      .spyOn(BrokerCtor.prototype as { createSession: () => Promise<unknown> }, "createSession")
+      .mockRejectedValue(new Error("upstream timeout"));
+    const sendMessageSpy = vi.spyOn(
+      BrokerCtor.prototype as { sendMessage: () => Promise<unknown> },
+      "sendMessage",
+    );
+
+    const port = randomTestPort(30_350);
+    const env: EnvConfig = {
+      registryBrokerApiUrl: "https://example.com/registry/api/v1",
+      registryBrokerApiKey: undefined,
+      brokerRequestTimeoutMs: 10_000,
+      mcpTransport: "http",
+      mcpHost: "127.0.0.1",
+      mcpPort: port,
+      mcpAllowedOrigins: ["http://localhost:*", "http://127.0.0.1:*"],
+      mcpServerBearerToken: undefined,
+      mcpSessionIdleTtlMs: 60_000,
+      mcpSessionMaxCount: 10,
+      mcpSessionReapIntervalMs: 1_000,
+      logLevel: "silent",
+      brokerRateLimitConcurrency: 5,
+      brokerRateLimitMinTimeMs: 1,
+      ledgerAccountId: "0.0.12345",
+      hederaNetwork: "hedera:testnet",
+      hederaAccountId: "0.0.12345",
+      hederaPrivateKey: "302e020100300506032b657004220420fakeprivatekeyfakeprivatekeyfakep",
+      evmLedgerNetwork: undefined,
+      ethPrivateKey: undefined,
+      rbEncryptionPrivateKey: undefined,
+    };
+
+    const flags = {
+      featureLegacySse: false,
+      featureMemorySqlite: false,
+      featureMemoryRedis: false,
+      featureLedgerAuth: false,
+      featureEncryptedChat: false,
+    };
+
+    const logger = createLogger({ logLevel: "silent" });
+    rateLimiter = createBrokerRateLimiter(env);
+
+    const createServer = () =>
+      createMcpServer({
+        env,
+        flags,
+        logger,
+        rateLimiter: rateLimiter!,
+      });
+
+    running = await runStreamableHttp({ env, flags, logger, createServer });
+    const url = `http://${env.mcpHost}:${env.mcpPort}/mcp`;
+
+    const initialize = await postJson(
+      url,
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion,
+          capabilities: { tools: {}, logging: {} },
+          clientInfo: { name: "integration-test", version: "0.1.0" },
+        },
+      },
+      {
+        "mcp-protocol-version": protocolVersion,
+      },
+    );
+
+    expect(initialize.payload.error).toBeUndefined();
+    const sessionId = initialize.response.headers.get("mcp-session-id");
+    expect(sessionId).toBeTruthy();
+
+    const delegate = await postJson(
+      url,
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: {
+          name: "workflow.delegate",
+          arguments: {
+            task: "Review the pending TypeScript changes for regressions.",
+            query: "typescript code review specialist",
+            limit: 3,
+          },
+        },
+      },
+      {
+        "mcp-session-id": String(sessionId),
+        "mcp-protocol-version": protocolVersion,
+      },
+    );
+
+    expect(delegate.payload.error).toBeUndefined();
+    expect(delegate.payload.result?.isError).toBe(true);
+    expect(delegate.payload.result?.structuredContent?.error?.message).toContain("upstream timeout");
+    expect(createSessionSpy).toHaveBeenCalledTimes(1);
+    expect(sendMessageSpy).toHaveBeenCalledTimes(0);
   });
 
   test("does not retry a different candidate after sendMessage fails", async () => {

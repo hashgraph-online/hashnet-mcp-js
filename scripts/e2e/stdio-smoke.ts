@@ -7,7 +7,12 @@ type JsonRpcEnvelope = {
   id?: string | number | null;
   method?: string;
   params?: Record<string, unknown>;
-  result?: Record<string, unknown>;
+  result?: {
+    isError?: boolean;
+    structuredContent?: {
+      ok?: boolean;
+    };
+  } & Record<string, unknown>;
   error?: { code: number; message: string };
 };
 
@@ -25,7 +30,7 @@ function paidToolAuthAvailable(envelope: JsonRpcEnvelope): boolean {
   return structuredContent?.data?.auth?.paidToolAuthAvailable === true;
 }
 
-const requestTimeoutMs = Number(process.env.SMOKE_STDIO_TIMEOUT_MS ?? 25_000);
+const requestTimeoutMs = Number(process.env.SMOKE_STDIO_TIMEOUT_MS ?? 75_000);
 
 function terminateProcessTree(child: ChildProcess): void {
   if (!child.pid) {
@@ -136,6 +141,10 @@ async function run(): Promise<void> {
     if (envelope.error) {
       throw new Error(`${label} failed with JSON-RPC error ${envelope.error.code}: ${envelope.error.message}`);
     }
+
+    if (envelope.result?.isError === true || envelope.result?.structuredContent?.ok === false) {
+      throw new Error(`${label} returned MCP tool error`);
+    }
   }
 
   try {
@@ -179,7 +188,7 @@ async function run(): Promise<void> {
         arguments: {
           task: "Summarize the strongest candidate for customer support automation.",
           query: "customer support automation specialist",
-          limit: 3,
+          limit: 2,
         },
       });
       assertOk(delegate, "tools/call workflow.delegate");

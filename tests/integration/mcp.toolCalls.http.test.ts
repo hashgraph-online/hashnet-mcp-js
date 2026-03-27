@@ -279,17 +279,33 @@ describe("MCP HTTP tool calls", () => {
       hits: [
         {
           uaid: "uaid:delegate-1",
-          name: "Registry Reviewer",
+          name: "Primary Candidate",
           description: "Reviews TypeScript changes",
           registry: "hashgraph-online",
           endpoint: "https://delegate.example.com/mcp",
           score: 0.99,
+          available: false,
+          communicationSupported: true,
+          routingSupported: true,
+        },
+        {
+          uaid: "uaid:delegate-2",
+          name: "Registry Reviewer",
+          description: "Reviews TypeScript changes",
+          registry: "hashgraph-online",
+          endpoint: "https://delegate-2.example.com/mcp",
+          score: 0.88,
+          available: true,
+          communicationSupported: true,
+          routingSupported: true,
         },
       ],
     });
-    vi.spyOn(BrokerCtor.prototype as { createSession: () => Promise<unknown> }, "createSession").mockResolvedValue({
-      sessionId: "session-123",
-    });
+    vi.spyOn(BrokerCtor.prototype as { createSession: () => Promise<unknown> }, "createSession")
+      .mockRejectedValueOnce(new Error("upstream timeout"))
+      .mockResolvedValue({
+        sessionId: "session-123",
+      });
     vi.spyOn(BrokerCtor.prototype as { sendMessage: () => Promise<unknown> }, "sendMessage").mockResolvedValue({
       messageId: "message-1",
       accepted: true,
@@ -396,9 +412,9 @@ describe("MCP HTTP tool calls", () => {
         }
       | undefined;
 
-    expect(delegateData?.candidateCount).toBe(1);
+    expect(delegateData?.candidateCount).toBe(2);
     expect(delegateData?.selectedAgent?.uaid).toBe("uaid:delegate-1");
-    expect(delegateData?.selectedAgent?.name).toBe("Registry Reviewer");
+    expect(delegateData?.selectedAgent?.name).toBe("Primary Candidate");
     expect(delegateData?.session?.sessionId).toBe("session-123");
     expect(authenticateSpy).toHaveBeenCalledTimes(1);
   });

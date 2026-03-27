@@ -5,7 +5,12 @@ import path from "node:path";
 interface JsonRpcResponse {
   jsonrpc: "2.0";
   id: string | number | null;
-  result?: Record<string, unknown>;
+  result?: {
+    isError?: boolean;
+    structuredContent?: {
+      ok?: boolean;
+    };
+  } & Record<string, unknown>;
   error?: {
     code: number;
     message: string;
@@ -87,6 +92,10 @@ async function postJson(
 function assertJsonRpcOk(payload: JsonRpcResponse, label: string): void {
   if (payload.error) {
     throw new Error(`${label} failed with JSON-RPC error ${payload.error.code}: ${payload.error.message}`);
+  }
+
+  if (payload.result?.isError === true || payload.result?.structuredContent?.ok === false) {
+    throw new Error(`${label} returned MCP tool error`);
   }
 }
 

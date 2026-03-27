@@ -14,19 +14,18 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10.10.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
@@ -52,11 +51,23 @@ jobs:
             echo "publish=true" >> "$GITHUB_OUTPUT"
             echo "Will publish $PKG_VERSION (npm latest is $PUBLISHED)."
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to npm
         if: steps.publish_check.outputs.publish == 'true'
-        run: pnpm publish --access public --no-git-checks
+        shell: bash
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          FALLBACK_NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if npm publish --access public; then
+            exit 0
+          fi
+
+          if [ -z "${FALLBACK_NPM_TOKEN}" ]; then
+            echo "Trusted publishing failed and NPM_TOKEN is not configured." >&2
+            exit 1
+          fi
+
+          echo "Trusted publishing failed, retrying with NPM_TOKEN." >&2
+          NODE_AUTH_TOKEN="${FALLBACK_NPM_TOKEN}" npm publish --access public

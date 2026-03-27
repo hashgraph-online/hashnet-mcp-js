@@ -1,8 +1,0 @@
-{
-  "accountId": "0.0.123456",
-  "network": "testnet",
-  "signature": "SIGNED_CHALLENGE_BYTES",
-  "signatureKind": "raw",
-  "publicKey": "302a300506032b6570032100PUBLICKEY",
-  "expiresInMinutes": 15
-}

@@ -1,109 +1,61 @@
 {
   "name": "@hol-org/hashnet-mcp",
-  "version": "1.0.21",
-  "description": "HOL MCP server for agentic search, discovery, registration, chat, and more with the Hashgraph Online Registry Broker.",
+  "version": "0.1.0",
+  "description": "No-stubs HOL MCP Server POC",
   "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.cjs",
-  "types": "./dist/index.d.cts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.cts",
-      "import": "./dist/index.cjs",
-      "default": "./dist/index.cjs"
-    },
-    "./cli/up": {
-      "import": "./dist/cli/up.cjs",
-      "default": "./dist/cli/up.cjs"
-    }
-  },
+  "license": "Apache-2.0",
   "bin": {
-    "hashnet-mcp": "./dist/cli/up.cjs"
+    "hashnet-mcp": "bin/hashnet-mcp.js"
   },
   "files": [
-    "dist"
+    "bin",
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
+  "main": "./dist/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.6.0",
   "scripts": {
     "dev:stdio": "MCP_TRANSPORT=stdio tsx src/index.ts",
-    "dev:sse": "tsx src/index.ts",
-    "cli:up": "tsx src/cli/up.ts",
+    "dev:http": "MCP_TRANSPORT=http tsx src/index.ts",
+    "dev:http:compat": "FEATURE_LEGACY_SSE=1 MCP_TRANSPORT=http tsx src/index.ts",
     "build": "tsup --config tsup.config.ts",
+    "lint": "eslint .",
     "start": "node dist/index.js",
-    "quickstart": "tsx scripts/quickstart.ts",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:tools": "tsx scripts/run-tool-suite.ts --spawn",
-    "test:tools:mock": "tsx scripts/run-tool-suite.ts --mock",
-    "chat:smoke": "tsx scripts/chat-smoke.ts",
-    "workflow:list": "tsx scripts/list-workflows.ts",
-    "workflow:run": "tsx scripts/run-workflow.ts",
-    "workflow:register": "tsx scripts/workflow-register.ts",
-    "workflow:register:advanced": "tsx scripts/workflow-register-advanced.ts",
-    "workflow:register:erc8004": "tsx scripts/workflow-register-erc8004.ts",
-    "mock:broker": "tsx scripts/mock-broker.ts",
-    "claude:install": "tsx scripts/install-claude-code.ts",
-    "cursor:install": "tsx scripts/install-cursor.ts"
+    "check:no-stubs": "tsx scripts/tool-suite/run-tool-suite.ts",
+    "live:runs": "tsx scripts/e2e/live-runs.ts",
+    "smoke:http": "tsx scripts/e2e/streamable-http-smoke.ts",
+    "smoke:stdio": "tsx scripts/e2e/stdio-smoke.ts",
+    "typecheck": "tsc --noEmit",
+    "prepack": "pnpm build"
   },
-  "homepage": "https://hashgraphonline.com",
-  "funding": {
-    "type": "individual",
-    "url": "https://github.com/sponsors/hashgraph-online"
-  },
-  "bugs": {
-    "url": "https://github.com/hashgraph-online/hashnet-mcp-js/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/hashgraph-online/hashnet-mcp-js.git"
-  },
-  "keywords": [
-    "hashgraph online",
-    "hedera",
-    "hashgraph",
-    "web3",
-    "mcp",
-    "fastmcp",
-    "agent",
-    "registry broker",
-    "standards",
-    "sdk"
-  ],
-  "author": "Hashgraph Online <hello@hashgraphonline.com>",
-  "license": "Apache-2.0",
-  "engines": {
-    "node": ">=18"
-  },
-  "packageManager": "pnpm@10.10.0",
-  "devDependencies": {
-    "@hashgraphonline/standards-sdk": "^0.1.139",
-    "@hono/node-server": "^1.19.6",
-    "@modelcontextprotocol/sdk": "^1.21.1",
-    "@types/node": "^24.10.0",
-    "@vitest/coverage-v8": "^2.1.4",
+  "dependencies": {
+    "@hashgraphonline/standards-sdk": "^0.1.165",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "bottleneck": "^2.19.5",
-    "dotenv": "^17.2.3",
-    "fastmcp": "^3.22.0",
-    "hono": "^4.10.5",
-    "ioredis": "^5.8.2",
-    "pino": "^10.1.0",
-    "tsup": "^8.5.0",
-    "tsx": "^4.20.6",
+    "dotenv": "^17.3.1",
+    "express": "4",
+    "pino": "^10.3.1",
+    "undici": "^7.22.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/express": "^4.17.25",
+    "@types/node": "^20.19.37",
+    "@vitest/coverage-v8": "^4.0.18",
+    "eslint": "^10.0.3",
+    "globals": "^17.4.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "undici": "^7.16.0",
-    "vitest": "^2.1.4",
-    "zod": "^4.1.12"
-  },
-  "dependencies": {},
-  "peerDependencies": {
-    "better-sqlite3": "^11.5.0"
-  },
-  "peerDependenciesMeta": {
-    "better-sqlite3": {
-      "optional": true
-    }
-  },
-  "overrides": {
-    "@hashgraphonline/standards-sdk": "^0.1.139"
+    "typescript-eslint": "^8.57.0",
+    "vitest": "^4.0.18"
   }
 }

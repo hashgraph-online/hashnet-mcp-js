@@ -143,12 +143,34 @@ jobs:
           tag="v${{ steps.publish_check.outputs.version }}"
           docs_line="- Docs: ${HOL_MCP_DOCS_URL}"
           release_notes="$(printf '## Documentation\n%s\n' "${docs_line}")"
+          previous_semver_tag="$(git tag --list 'v[0-9]*' --sort=-version:refname | grep -Fxv "${tag}" | head -n1 || true)"
 
           if ! gh release view "${tag}" >/dev/null 2>&1; then
-            gh release create "${tag}" \
-              --title "${tag}" \
-              --target "${GITHUB_SHA}" \
-              --generate-notes
+            if [ -n "${previous_semver_tag}" ]; then
+              gh release create "${tag}" \
+                --title "${tag}" \
+                --target "${GITHUB_SHA}" \
+                --generate-notes \
+                --notes-start-tag "${previous_semver_tag}"
+            else
+              notes_file="$(mktemp)"
+              {
+                printf '## Initial Release\n\n'
+                printf '`@hol-org/hashnet-mcp` initial public release of the HOL MCP server.\n\n'
+                printf '## Merged Pull Requests\n'
+                gh pr list \
+                  --state merged \
+                  --base "${GITHUB_REF_NAME}" \
+                  --limit 200 \
+                  --json number,title,url,mergedAt \
+                  --jq 'sort_by(.mergedAt) | reverse | .[] | "- #\(.number) \(.title)"'
+              } > "${notes_file}"
+              gh release create "${tag}" \
+                --title "${tag}" \
+                --target "${GITHUB_SHA}" \
+                --notes-file "${notes_file}"
+              rm -f "${notes_file}"
+            fi
           fi
 
           body="$(gh release view "${tag}" --json body --jq '.body // \"\"')"

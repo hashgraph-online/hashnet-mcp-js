@@ -3,6 +3,7 @@ name: Publish
 on:
   push:
     branches:
+      - master
       - main
 
 concurrency:
@@ -13,11 +14,15 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write
+    env:
+      HOL_MCP_DOCS_URL: https://hol.org/mcp
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -71,3 +76,71 @@ jobs:
 
           echo "Trusted publishing failed, retrying with NPM_TOKEN." >&2
           NODE_AUTH_TOKEN="${FALLBACK_NPM_TOKEN}" npm publish --access public
+
+      - name: Create git tag
+        id: tag_release
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v${{ steps.publish_check.outputs.version }}"
+          publish_requested="${{ steps.publish_check.outputs.publish }}"
+
+          # Resolve the commit SHA for an existing remote tag (annotated or lightweight).
+          remote_sha="$(git ls-remote --tags origin "refs/tags/${tag}^{}" | awk 'NR==1 {print $1}')"
+          if [ -z "${remote_sha}" ]; then
+            remote_sha="$(git ls-remote --tags origin "refs/tags/${tag}" | awk 'NR==1 {print $1}')"
+          fi
+
+          if [ -n "${remote_sha}" ]; then
+            if [ "${remote_sha}" != "${GITHUB_SHA}" ]; then
+              if [ "${publish_requested}" = "true" ]; then
+                echo "Tag ${tag} already exists on ${remote_sha}, expected ${GITHUB_SHA}." >&2
+                echo "Refusing to proceed because release source and artifact would diverge." >&2
+                exit 1
+              fi
+
+              echo "Tag ${tag} already exists on ${remote_sha}; skipping tag/release management for non-publish commit ${GITHUB_SHA}."
+              echo "manage_release=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Tag ${tag} already points to ${GITHUB_SHA}; skipping tag creation."
+            echo "manage_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git tag "${tag}" "${GITHUB_SHA}"
+          git push origin "${tag}"
+          echo "manage_release=true" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure GitHub release includes automated notes and canonical docs URL
+        if: steps.tag_release.outputs.manage_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="v${{ steps.publish_check.outputs.version }}"
+          docs_line="- Docs: ${HOL_MCP_DOCS_URL}"
+          release_notes="$(printf '## Documentation\n%s\n' "${docs_line}")"
+
+          if ! gh release view "${tag}" >/dev/null 2>&1; then
+            gh release create "${tag}" \
+              --title "${tag}" \
+              --target "${GITHUB_SHA}" \
+              --generate-notes
+          fi
+
+          body="$(gh release view "${tag}" --json body --jq '.body // \"\"')"
+          if printf '%s' "${body}" | grep -Fq "${HOL_MCP_DOCS_URL}"; then
+            echo "Release ${tag} already contains canonical docs URL."
+            exit 0
+          fi
+
+          notes_file="$(mktemp)"
+          {
+            printf '%s\n' "${body}"
+            printf '\n%s' "${release_notes}"
+          } > "${notes_file}"
+          gh release edit "${tag}" --notes-file "${notes_file}"
+          rm -f "${notes_file}"

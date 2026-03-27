@@ -1,7 +1,28 @@
 {
   "name": "@hol-org/hashnet-mcp",
   "version": "0.1.0",
-  "description": "No-stubs HOL MCP Server POC",
+  "description": "Universal MCP server for HOL Registry Broker discovery, chat, registration, and workflow automation.",
+  "homepage": "https://hol.org/mcp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hashgraph-online/hashnet-mcp-js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hashgraph-online/hashnet-mcp-js/issues"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/hashgraph-online"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "registry-broker",
+    "hashnet",
+    "hedera",
+    "agent",
+    "workflow"
+  ],
   "type": "module",
   "license": "Apache-2.0",
   "bin": {

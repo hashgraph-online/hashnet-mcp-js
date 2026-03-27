@@ -104,7 +104,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): EnvConfig {
     REGISTRY_BROKER_API_KEY: normalizeOptionalSecret(source.REGISTRY_BROKER_API_KEY),
     BROKER_REQUEST_TIMEOUT_MS: parseInteger(
       source.BROKER_REQUEST_TIMEOUT_MS,
-      15_000,
+      60_000,
       "BROKER_REQUEST_TIMEOUT_MS",
     ),
     MCP_TRANSPORT: rawTransport,

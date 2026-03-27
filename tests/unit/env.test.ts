@@ -6,7 +6,7 @@ describe("env loader", () => {
   test("defaults are applied", () => {
     const env = loadEnv({});
     expect(env.registryBrokerApiUrl).toBe("https://hol.org/registry/api/v1");
-    expect(env.brokerRequestTimeoutMs).toBe(15_000);
+    expect(env.brokerRequestTimeoutMs).toBe(60_000);
     expect(env.mcpHost).toBe("127.0.0.1");
     expect(env.mcpPort).toBe(3333);
     expect(env.mcpSessionIdleTtlMs).toBe(15 * 60 * 1000);

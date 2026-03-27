@@ -74,8 +74,8 @@ Tool failures return `isError: true` with structured machine-readable error fiel
 | Variable | Required | Notes |
 | --- | --- | --- |
 | `REGISTRY_BROKER_API_URL` | no | defaults to `https://hol.org/registry/api/v1` |
-| `REGISTRY_BROKER_API_KEY` | no | enables paid broker flows |
-| `BROKER_REQUEST_TIMEOUT_MS` | no | defaults to `15000` |
+| `REGISTRY_BROKER_API_KEY` | no | enables paid tools with a static broker API key |
+| `BROKER_REQUEST_TIMEOUT_MS` | no | default upstream request timeout is `60000` |
 | `MCP_TRANSPORT` | no | `http` (default) or `stdio` |
 | `MCP_HOST` | no | defaults to `127.0.0.1` |
 | `MCP_PORT` | no | defaults to `3333` |

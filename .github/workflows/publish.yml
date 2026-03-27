@@ -78,7 +78,6 @@ jobs:
           NODE_AUTH_TOKEN="${FALLBACK_NPM_TOKEN}" npm publish --access public
 
       - name: Create git tag
-        if: steps.publish_check.outputs.publish == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -104,7 +103,6 @@ jobs:
           git push origin "${tag}"
 
       - name: Ensure GitHub release includes automated notes and canonical docs URL
-        if: steps.publish_check.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash

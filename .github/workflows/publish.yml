@@ -3,6 +3,7 @@ name: Publish
 on:
   push:
     branches:
+      - master
       - main
 
 concurrency:
@@ -13,11 +14,15 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write
+    env:
+      HOL_MCP_DOCS_URL: https://hol.org/mcp
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -71,3 +76,51 @@ jobs:
 
           echo "Trusted publishing failed, retrying with NPM_TOKEN." >&2
           NODE_AUTH_TOKEN="${FALLBACK_NPM_TOKEN}" npm publish --access public
+
+      - name: Create git tag
+        if: steps.publish_check.outputs.publish == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v${{ steps.publish_check.outputs.version }}"
+          if git ls-remote --tags origin "refs/tags/${tag}" | grep -q "${tag}"; then
+            echo "Tag ${tag} already exists; skipping tag creation."
+            exit 0
+          fi
+          git tag "${tag}" "${GITHUB_SHA}"
+          git push origin "${tag}"
+
+      - name: Ensure GitHub release includes automated notes and canonical docs URL
+        if: steps.publish_check.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="v${{ steps.publish_check.outputs.version }}"
+          docs_line="- Docs: ${HOL_MCP_DOCS_URL}"
+          release_notes="$(printf '## Documentation\n%s\n' "${docs_line}")"
+
+          if ! gh release view "${tag}" >/dev/null 2>&1; then
+            gh release create "${tag}" \
+              --title "${tag}" \
+              --target "${GITHUB_SHA}" \
+              --generate-notes \
+              --notes "${release_notes}"
+            exit 0
+          fi
+
+          body="$(gh release view "${tag}" --json body --jq '.body // \"\"')"
+          if printf '%s' "${body}" | grep -Fq "${HOL_MCP_DOCS_URL}"; then
+            echo "Release ${tag} already contains canonical docs URL."
+            exit 0
+          fi
+
+          notes_file="$(mktemp)"
+          {
+            printf '%s\n' "${body}"
+            printf '\n%s' "${release_notes}"
+          } > "${notes_file}"
+          gh release edit "${tag}" --notes-file "${notes_file}"
+          rm -f "${notes_file}"

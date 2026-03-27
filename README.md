@@ -1,63 +1,58 @@
-# HOL MCP Server POC
+# Hashnet MCP JS
 
-No-stubs MCP server that bridges MCP tools to the HOL Registry Broker using `@hashgraphonline/standards-sdk`.
+[![npm version](https://img.shields.io/npm/v/%40hol-org%2Fhashnet-mcp?logo=npm)](https://www.npmjs.com/package/@hol-org/hashnet-mcp)
+[![npm downloads](https://img.shields.io/npm/dm/%40hol-org%2Fhashnet-mcp?logo=npm)](https://www.npmjs.com/package/@hol-org/hashnet-mcp)
+[![Node version](https://img.shields.io/node/v/%40hol-org%2Fhashnet-mcp)](https://www.npmjs.com/package/@hol-org/hashnet-mcp)
+[![Bundle size](https://img.shields.io/bundlephobia/minzip/%40hol-org%2Fhashnet-mcp)](https://bundlephobia.com/package/@hol-org/hashnet-mcp)
+[![Publish](https://github.com/hashgraph-online/hashnet-mcp-js/actions/workflows/publish.yml/badge.svg?branch=master)](https://github.com/hashgraph-online/hashnet-mcp-js/actions/workflows/publish.yml)
+[![Canary](https://github.com/hashgraph-online/hashnet-mcp-js/actions/workflows/publish-canary.yml/badge.svg?branch=master)](https://github.com/hashgraph-online/hashnet-mcp-js/actions/workflows/publish-canary.yml)
+[![License](https://img.shields.io/github/license/hashgraph-online/hashnet-mcp-js)](https://github.com/hashgraph-online/hashnet-mcp-js/blob/master/LICENSE)
+[![CodeSandbox](https://img.shields.io/badge/CodeSandbox-Open-151515?logo=codesandbox)](https://codesandbox.io/p/sandbox/github/hashgraph-online/hashnet-mcp-js/tree/master)
+
+Universal MCP server for discovery, chat, registration, credits, and workflow automation across the HOL Registry Broker ecosystem.
+
+## Ecosystem
+
+| Surface | Link |
+| --- | --- |
+| npm package | [`@hol-org/hashnet-mcp`](https://www.npmjs.com/package/@hol-org/hashnet-mcp) |
+| GitHub repo | [hashgraph-online/hashnet-mcp-js](https://github.com/hashgraph-online/hashnet-mcp-js) |
+| GitHub releases | [Releases](https://github.com/hashgraph-online/hashnet-mcp-js/releases) |
+| Documentation | [hol.org/mcp](https://hol.org/mcp) |
+| CodeSandbox | [Open examples in browser](https://codesandbox.io/p/sandbox/github/hashgraph-online/hashnet-mcp-js/tree/master) |
 
 ## Quickstart
 
-1. Install dependencies:
-   - `pnpm install`
-2. Configure env:
-   - `cp .env.example .env`
-   - set `REGISTRY_BROKER_API_KEY` for paid flows, or configure ledger auth with `LEDGER_ACCOUNT_ID`/`HEDERA_ACCOUNT_ID` plus the matching network and private key
-3. Run transports:
-   - HTTP: `pnpm dev:http`
-   - stdio: `pnpm dev:stdio`
-   - HTTP + legacy SSE: `pnpm dev:http:compat`
+```bash
+pnpm install
+cp .env.example .env
+pnpm dev:http
+```
 
-## NPX Launch
+Common launch modes:
 
-Once this package is published, you can launch it directly with `npx`:
+- `pnpm dev:stdio`
+- `pnpm dev:http`
+- `pnpm dev:http:compat`
+- `npx @hol-org/hashnet-mcp --help`
+- `npx @hol-org/hashnet-mcp --stdio`
+- `npx @hol-org/hashnet-mcp --http --host 127.0.0.1 --port 3333`
 
-- stdio: `REGISTRY_BROKER_API_KEY=... npx @hol-org/hashnet-mcp --stdio`
-- HTTP: `REGISTRY_BROKER_API_KEY=... npx @hol-org/hashnet-mcp --http --host 127.0.0.1 --port 3333`
-- help: `npx @hol-org/hashnet-mcp --help`
+When installed globally or linked locally, the binary is `hashnet-mcp`.
 
-Ledger-auth launches use the same binary and env-based credentials:
+## Supported Transports
 
-- stdio: `LEDGER_ACCOUNT_ID=0.0.12345 HEDERA_NETWORK=hedera:testnet HEDERA_PRIVATE_KEY=... npx @hol-org/hashnet-mcp --stdio`
+| Transport | Endpoint(s) | Notes |
+| --- | --- | --- |
+| stdio | process stdin/stdout | best for local agent runtimes |
+| Streamable HTTP | `/mcp`, `/mcp/stream` | recommended HTTP transport |
+| legacy HTTP + SSE | `/mcp/sse`, `/mcp/messages` | enabled with `FEATURE_LEGACY_SSE=1` |
 
-When installed globally or linked locally, the binary name is `hashnet-mcp`.
+Runtime utility endpoints:
 
-Supported CLI flags:
-
-- `--transport <stdio|http>`
-- `--stdio`
-- `--http`
-- `--host <host>`
-- `--port <port>`
-- `--allowed-origins <csv>`
-- `--broker-url <url>`
-- `--bearer-token <token>`
-- `--log-level <level>`
-- `--legacy-sse`
-
-## Commands
-
-- `pnpm build`
-- `pnpm start`
-- `pnpm test:run`
-- `pnpm test:coverage`
-- `pnpm check:no-stubs`
-- `pnpm smoke:http`
-- `pnpm smoke:stdio`
-
-## Security Defaults
-
-- Binds to `127.0.0.1` by default.
-- Validates `Origin` for HTTP requests when present.
-- Supports optional `MCP_SERVER_BEARER_TOKEN` gate for HTTP transport.
-- Reaps idle HTTP sessions and enforces a maximum active session count.
-- Redacts sensitive secrets in logs.
+- `/healthz`
+- `/readyz`
+- `/metrics`
 
 ## Tool Surface
 
@@ -66,53 +61,63 @@ Supported CLI flags:
 - Registration: `hol.getRegistrationQuote`, `hol.registerAgent`, `hol.waitForRegistrationCompletion`
 - Workflows: `workflow.discovery`, `workflow.delegate`, `workflow.registration`
 
-All tools now return a structured success envelope in `structuredContent`:
+Tool success responses use structured envelopes in `structuredContent`:
 
 - `ok`
 - `data`
 - `meta`
 
-Tool failures return `isError: true` plus a structured error envelope with machine-readable `code`, `category`, and `retryable` fields.
+Tool failures return `isError: true` with structured machine-readable error fields (`code`, `category`, `retryable`).
 
-## Transport Compatibility
-
-| Transport | Endpoint(s) | Status |
-|---|---|---|
-| stdio | process stdin/stdout | supported |
-| Streamable HTTP | `/mcp`, `/mcp/stream` | supported |
-| legacy HTTP+SSE | `/mcp/sse`, `/mcp/messages` | supported behind `FEATURE_LEGACY_SSE=1` |
-
-## HTTP Runtime Endpoints
-
-- MCP: `/mcp`, `/mcp/stream`
-- Health: `/healthz`
-- Readiness: `/readyz`
-- Metrics: `/metrics`
-
-## Environment Matrix
+## Configuration
 
 | Variable | Required | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `REGISTRY_BROKER_API_URL` | no | defaults to `https://hol.org/registry/api/v1` |
-| `REGISTRY_BROKER_API_KEY` | no | enables paid tools with a static broker API key |
-| `BROKER_REQUEST_TIMEOUT_MS` | no | default upstream request timeout is `15000` |
+| `REGISTRY_BROKER_API_KEY` | no | enables paid broker flows |
+| `BROKER_REQUEST_TIMEOUT_MS` | no | defaults to `15000` |
 | `MCP_TRANSPORT` | no | `http` (default) or `stdio` |
 | `MCP_HOST` | no | defaults to `127.0.0.1` |
 | `MCP_PORT` | no | defaults to `3333` |
-| `MCP_ALLOWED_ORIGINS` | no | used for HTTP Origin validation |
-| `MCP_SERVER_BEARER_TOKEN` | no | required when binding to non-local host |
-| `MCP_SESSION_IDLE_TTL_MS` | no | idle HTTP session timeout, defaults to `900000` |
-| `MCP_SESSION_MAX_COUNT` | no | maximum active HTTP sessions, defaults to `250` |
-| `MCP_SESSION_REAP_INTERVAL_MS` | no | idle session reap interval, defaults to `60000` |
-| `LEDGER_ACCOUNT_ID` | no | generic ledger identity used for ledger-auth flows; falls back to `HEDERA_ACCOUNT_ID` |
-| `HEDERA_ACCOUNT_ID` | no | Hedera account id for ledger auth and backwards compatibility |
-| `HEDERA_NETWORK` | no | Hedera ledger network, for example `hedera:testnet` |
-| `HEDERA_PRIVATE_KEY` | no | Hedera private key for broker ledger auth |
-| `EVM_LEDGER_NETWORK` | no | EVM CAIP-2 network id, for example `eip155:1` |
-| `ETH_PK` | no | EVM private key for broker ledger auth |
+| `MCP_ALLOWED_ORIGINS` | no | comma-separated allow list |
+| `MCP_SERVER_BEARER_TOKEN` | no | recommended when binding non-local host |
+| `MCP_SESSION_IDLE_TTL_MS` | no | defaults to `900000` |
+| `MCP_SESSION_MAX_COUNT` | no | defaults to `250` |
+| `MCP_SESSION_REAP_INTERVAL_MS` | no | defaults to `60000` |
+| `LEDGER_ACCOUNT_ID` | no | generic ledger identity fallback |
+| `HEDERA_ACCOUNT_ID` | no | Hedera account id |
+| `HEDERA_NETWORK` | no | e.g. `hedera:testnet` |
+| `HEDERA_PRIVATE_KEY` | no | Hedera private key |
+| `EVM_LEDGER_NETWORK` | no | e.g. `eip155:1` |
+| `ETH_PK` | no | EVM private key |
 
-## No-Stubs Validation
+## Security Defaults
 
-- Static stub ban check in CI.
-- Smoke tests validate initialize -> tools/list -> real tool calls.
-- Live Broker calls required for final acceptance gates.
+- Binds to `127.0.0.1` by default.
+- Validates `Origin` for HTTP requests when present.
+- Supports optional HTTP bearer-token gate.
+- Reaps idle HTTP sessions and enforces max active sessions.
+- Redacts sensitive values in logs.
+
+## Development
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm build` | compile distributable artifacts |
+| `pnpm start` | run compiled server |
+| `pnpm lint` | run ESLint |
+| `pnpm typecheck` | run TypeScript checks |
+| `pnpm test:run` | run Vitest once |
+| `pnpm test:coverage` | run Vitest with coverage |
+| `pnpm check:no-stubs` | enforce no-stubs contract |
+| `pnpm smoke:http` | streamable HTTP smoke test |
+| `pnpm smoke:stdio` | stdio smoke test |
+
+## Release Notes Automation
+
+GitHub releases are generated automatically from merged pull requests:
+
+- release tags are created during publish (`vX.Y.Z`)
+- GitHub release notes are generated with GitHub's release-note engine
+- changelog categories are controlled via `.github/release.yml`
+- canonical docs links are appended to each release

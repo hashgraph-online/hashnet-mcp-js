@@ -17,13 +17,18 @@ interface SelectedAgentSummary {
 }
 
 interface DelegationCandidate {
-  hit: JsonObject;
   summary: SelectedAgentSummary;
   target: {
     uaid?: string;
     agentUrl?: string;
   };
+  rank: number;
 }
+
+const RANK_SCORE_AVAILABLE = 8;
+const RANK_SCORE_COMMUNICATION_SUPPORTED = 4;
+const RANK_SCORE_ROUTING_SUPPORTED = 2;
+const RANK_TRUST_SCORE_DIVISOR = 100;
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
@@ -50,11 +55,36 @@ function summarizeAgent(hit: JsonObject, fallbackAgentUrl?: string): SelectedAge
 
 function rankCandidate(hit: JsonObject): number {
   return (
-    (booleanValue(hit.available) ? 8 : 0) +
-    (booleanValue(hit.communicationSupported) ? 4 : 0) +
-    (booleanValue(hit.routingSupported) ? 2 : 0) +
-    (numberValue(hit.trustScore) ?? 0) / 100
+    (booleanValue(hit.available) ? RANK_SCORE_AVAILABLE : 0) +
+    (booleanValue(hit.communicationSupported) ? RANK_SCORE_COMMUNICATION_SUPPORTED : 0) +
+    (booleanValue(hit.routingSupported) ? RANK_SCORE_ROUTING_SUPPORTED : 0) +
+    (numberValue(hit.trustScore) ?? 0) / RANK_TRUST_SCORE_DIVISOR
   );
+}
+
+function candidateTarget(hit: JsonObject): DelegationCandidate["target"] {
+  return {
+    uaid: stringValue(hit.uaid),
+    agentUrl: stringValue(hit.agentUrl) ?? stringValue(hit.endpoint),
+  };
+}
+
+function hasRoutableTarget(target: DelegationCandidate["target"]): boolean {
+  return Boolean(target.uaid || target.agentUrl);
+}
+
+function candidateFromHit(hit: JsonObject): DelegationCandidate | null {
+  const target = candidateTarget(hit);
+
+  if (!hasRoutableTarget(target)) {
+    return null;
+  }
+
+  return {
+    summary: summarizeAgent(hit),
+    target,
+    rank: rankCandidate(hit),
+  };
 }
 
 function notFoundError(message: string): Error & { status: number } {
@@ -115,9 +145,9 @@ export function registerDelegateWorkflow(server: McpServer, ctx: ToolRegisterCon
             };
             candidates = [
               {
-                hit: resolved,
                 summary: selectedAgent,
                 target,
+                rank: rankCandidate(resolved),
               },
             ];
           } else if (args.agentUrl) {
@@ -127,9 +157,9 @@ export function registerDelegateWorkflow(server: McpServer, ctx: ToolRegisterCon
             };
             candidates = [
               {
-                hit: {},
                 summary: selectedAgent,
                 target,
+                rank: 0,
               },
             ];
           } else {
@@ -151,27 +181,20 @@ export function registerDelegateWorkflow(server: McpServer, ctx: ToolRegisterCon
             const hits = Array.isArray(search.hits)
               ? search.hits.filter((hit): hit is JsonObject => !!hit && typeof hit === "object")
               : [];
-            const orderedHits = [...hits].sort((left, right) => rankCandidate(right) - rankCandidate(left));
-            const selectedHit = orderedHits[0];
+            const orderedCandidates = hits
+              .map((hit) => candidateFromHit(hit))
+              .filter((candidate): candidate is DelegationCandidate => candidate !== null)
+              .sort((left, right) => right.rank - left.rank);
+            const selectedCandidate = orderedCandidates[0];
 
-            if (!selectedHit) {
+            if (!selectedCandidate) {
               throw notFoundError(`No registry agents matched "${query}".`);
             }
 
-            candidateCount = orderedHits.length;
-            selectedAgent = summarizeAgent(selectedHit);
-            target = {
-              uaid: stringValue(selectedHit.uaid),
-              agentUrl: stringValue(selectedHit.agentUrl) ?? stringValue(selectedHit.endpoint),
-            };
-            candidates = orderedHits.map((hit) => ({
-              hit,
-              summary: summarizeAgent(hit),
-              target: {
-                uaid: stringValue(hit.uaid),
-                agentUrl: stringValue(hit.agentUrl) ?? stringValue(hit.endpoint),
-              },
-            }));
+            candidateCount = orderedCandidates.length;
+            selectedAgent = selectedCandidate.summary;
+            target = selectedCandidate.target;
+            candidates = orderedCandidates;
           }
 
           if (!target.uaid && !target.agentUrl) {
@@ -183,60 +206,30 @@ export function registerDelegateWorkflow(server: McpServer, ctx: ToolRegisterCon
           let lastError: Error | undefined;
 
           for (const [candidateIndex, candidate] of candidates.entries()) {
-            if (!candidate.target.uaid && !candidate.target.agentUrl) {
-              continue;
+            await ctx.server.sendLoggingMessage(
+              {
+                level: "info",
+                data: `workflow.delegate: creating delegated chat session for candidate ${candidateIndex + 1}/${candidates.length}`,
+              },
+              extra.sessionId,
+            );
+
+            const createPayload: Record<string, unknown> = {
+              auth: args.auth,
+              senderUaid: args.senderUaid,
+              historyTtlSeconds: args.historyTtlSeconds,
+              encryptionRequested: args.encryptionRequested,
+            };
+
+            if (candidate.target.uaid) {
+              createPayload.uaid = candidate.target.uaid;
+            } else {
+              createPayload.agentUrl = candidate.target.agentUrl;
             }
 
             try {
-              await ctx.server.sendLoggingMessage(
-                {
-                  level: "info",
-                  data: `workflow.delegate: creating delegated chat session for candidate ${candidateIndex + 1}/${candidates.length}`,
-                },
-                extra.sessionId,
-              );
-
-              const createPayload: Record<string, unknown> = {
-                auth: args.auth,
-                senderUaid: args.senderUaid,
-                historyTtlSeconds: args.historyTtlSeconds,
-                encryptionRequested: args.encryptionRequested,
-              };
-
-              if (candidate.target.uaid) {
-                createPayload.uaid = candidate.target.uaid;
-              } else {
-                createPayload.agentUrl = candidate.target.agentUrl;
-              }
-
               session = (await ctx.withBrokerAuth(traceId, "createSession", (client) =>
                 client.createSession(createPayload))) as JsonObject;
-
-              const sessionId = stringValue(session.sessionId);
-              if (!sessionId) {
-                throw new Error("Broker createSession response did not include sessionId.");
-              }
-
-              await ctx.server.sendLoggingMessage(
-                {
-                  level: "info",
-                  data: `workflow.delegate: relaying task to delegated session ${sessionId}`,
-                },
-                extra.sessionId,
-              );
-
-              response = (await ctx.withBrokerAuth(traceId, "sendMessage", (client) =>
-                client.sendMessage({
-                  sessionId,
-                  message: args.task,
-                  streaming: args.streaming,
-                  auth: args.auth,
-                }))) as JsonObject;
-
-              selectedAgent = candidate.summary;
-              target = candidate.target;
-              lastError = undefined;
-              break;
             } catch (error) {
               lastError = error instanceof Error ? error : new Error(String(error));
               await ctx.server.sendLoggingMessage(
@@ -246,11 +239,43 @@ export function registerDelegateWorkflow(server: McpServer, ctx: ToolRegisterCon
                 },
                 extra.sessionId,
               );
+              session = undefined;
+              continue;
             }
 
-            if (session && response) {
-              break;
+            const sessionId = stringValue(session.sessionId);
+            if (!sessionId) {
+              lastError = new Error("Broker createSession response did not include sessionId.");
+              await ctx.server.sendLoggingMessage(
+                {
+                  level: "warning",
+                  data: `workflow.delegate: candidate ${candidate.summary.name ?? candidate.summary.uaid ?? candidate.summary.agentUrl ?? candidateIndex + 1} failed: ${lastError.message}`,
+                },
+                extra.sessionId,
+              );
+              session = undefined;
+              continue;
             }
+
+            await ctx.server.sendLoggingMessage(
+              {
+                level: "info",
+                data: `workflow.delegate: relaying task to delegated session ${sessionId}`,
+              },
+              extra.sessionId,
+            );
+
+            response = (await ctx.withBrokerAuth(traceId, "sendMessage", (client) =>
+              client.sendMessage({
+                sessionId,
+                message: args.task,
+                streaming: args.streaming,
+                auth: args.auth,
+              }))) as JsonObject;
+
+            selectedAgent = candidate.summary;
+            lastError = undefined;
+            break;
           }
 
           if (!session || !response) {

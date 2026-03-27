@@ -9,6 +9,11 @@ import { createRequestRateLimiter } from "../../src/transports/requestRateLimit.
 import { runStreamableHttp, type RunningHttpServer } from "../../src/transports/httpStreamable.js";
 
 const protocolVersion = "2025-06-18";
+const testPortStride = 100;
+
+function randomTestPort(base: number): number {
+  return base + Math.floor(Math.random() * testPortStride);
+}
 
 interface JsonRpcPayload {
   error?: { message?: string };
@@ -17,6 +22,7 @@ interface JsonRpcPayload {
     isError?: boolean;
     structuredContent?: {
       ok?: boolean;
+      error?: { message?: string };
       data?: {
         server?: { name?: string };
         stats?: { totalAgents?: number };
@@ -90,7 +96,7 @@ describe("MCP HTTP tool calls", () => {
       totalRegistries: 3,
     });
 
-    const port = 3500 + Math.floor(Math.random() * 300);
+    const port = randomTestPort(30_100);
     const env: EnvConfig = {
       registryBrokerApiUrl: "https://example.com/registry/api/v1",
       registryBrokerApiKey: "integration-test-key",
@@ -278,13 +284,20 @@ describe("MCP HTTP tool calls", () => {
     vi.spyOn(BrokerCtor.prototype as { search: () => Promise<unknown> }, "search").mockResolvedValue({
       hits: [
         {
+          name: "Unroutable Candidate",
+          available: true,
+          communicationSupported: true,
+          routingSupported: true,
+          trustScore: 100,
+        },
+        {
           uaid: "uaid:delegate-1",
           name: "Primary Candidate",
           description: "Reviews TypeScript changes",
           registry: "hashgraph-online",
           endpoint: "https://delegate.example.com/mcp",
           score: 0.99,
-          available: false,
+          available: true,
           communicationSupported: true,
           routingSupported: true,
         },
@@ -295,7 +308,7 @@ describe("MCP HTTP tool calls", () => {
           registry: "hashgraph-online",
           endpoint: "https://delegate-2.example.com/mcp",
           score: 0.88,
-          available: true,
+          available: false,
           communicationSupported: true,
           routingSupported: true,
         },
@@ -311,7 +324,7 @@ describe("MCP HTTP tool calls", () => {
       accepted: true,
     });
 
-    const port = 3650 + Math.floor(Math.random() * 300);
+    const port = randomTestPort(30_300);
     const env: EnvConfig = {
       registryBrokerApiUrl: "https://example.com/registry/api/v1",
       registryBrokerApiKey: undefined,
@@ -413,14 +426,166 @@ describe("MCP HTTP tool calls", () => {
       | undefined;
 
     expect(delegateData?.candidateCount).toBe(2);
-    expect(delegateData?.selectedAgent?.uaid).toBe("uaid:delegate-1");
-    expect(delegateData?.selectedAgent?.name).toBe("Primary Candidate");
+    expect(delegateData?.selectedAgent?.uaid).toBe("uaid:delegate-2");
+    expect(delegateData?.selectedAgent?.name).toBe("Registry Reviewer");
     expect(delegateData?.session?.sessionId).toBe("session-123");
     expect(authenticateSpy).toHaveBeenCalledTimes(1);
   });
 
+  test("does not retry a different candidate after sendMessage fails", async () => {
+    const BrokerCtor = (standardsSdk as Record<string, unknown>).RegistryBrokerClient as {
+      prototype: Record<string, unknown>;
+    };
+
+    vi.spyOn(
+      BrokerCtor.prototype as {
+        authenticateWithLedgerCredentials: () => Promise<unknown>;
+      },
+      "authenticateWithLedgerCredentials",
+    ).mockResolvedValue({
+      key: "issued-ledger-key",
+      accountId: "0.0.12345",
+      network: "hedera:testnet",
+      apiKey: {
+        id: "api-key-1",
+        prefix: "issued",
+        lastFour: "1234",
+        createdAt: "2026-03-13T00:00:00.000Z",
+      },
+    });
+    vi.spyOn(BrokerCtor.prototype as { search: () => Promise<unknown> }, "search").mockResolvedValue({
+      hits: [
+        {
+          uaid: "uaid:delegate-1",
+          name: "Primary Candidate",
+          description: "Reviews TypeScript changes",
+          registry: "hashgraph-online",
+          endpoint: "https://delegate.example.com/mcp",
+          score: 0.99,
+          available: true,
+          communicationSupported: true,
+          routingSupported: true,
+        },
+        {
+          uaid: "uaid:delegate-2",
+          name: "Registry Reviewer",
+          description: "Reviews TypeScript changes",
+          registry: "hashgraph-online",
+          endpoint: "https://delegate-2.example.com/mcp",
+          score: 0.88,
+          available: false,
+          communicationSupported: true,
+          routingSupported: true,
+        },
+      ],
+    });
+    const createSessionSpy = vi
+      .spyOn(BrokerCtor.prototype as { createSession: () => Promise<unknown> }, "createSession")
+      .mockResolvedValue({
+        sessionId: "session-123",
+      });
+    const sendMessageSpy = vi
+      .spyOn(BrokerCtor.prototype as { sendMessage: () => Promise<unknown> }, "sendMessage")
+      .mockRejectedValue(new Error("upstream timeout"));
+
+    const port = randomTestPort(30_400);
+    const env: EnvConfig = {
+      registryBrokerApiUrl: "https://example.com/registry/api/v1",
+      registryBrokerApiKey: undefined,
+      brokerRequestTimeoutMs: 10_000,
+      mcpTransport: "http",
+      mcpHost: "127.0.0.1",
+      mcpPort: port,
+      mcpAllowedOrigins: ["http://localhost:*", "http://127.0.0.1:*"],
+      mcpServerBearerToken: undefined,
+      mcpSessionIdleTtlMs: 60_000,
+      mcpSessionMaxCount: 10,
+      mcpSessionReapIntervalMs: 1_000,
+      logLevel: "silent",
+      brokerRateLimitConcurrency: 5,
+      brokerRateLimitMinTimeMs: 1,
+      ledgerAccountId: "0.0.12345",
+      hederaNetwork: "hedera:testnet",
+      hederaAccountId: "0.0.12345",
+      hederaPrivateKey: "302e020100300506032b657004220420fakeprivatekeyfakeprivatekeyfakep",
+      evmLedgerNetwork: undefined,
+      ethPrivateKey: undefined,
+      rbEncryptionPrivateKey: undefined,
+    };
+
+    const flags = {
+      featureLegacySse: false,
+      featureMemorySqlite: false,
+      featureMemoryRedis: false,
+      featureLedgerAuth: false,
+      featureEncryptedChat: false,
+    };
+
+    const logger = createLogger({ logLevel: "silent" });
+    rateLimiter = createBrokerRateLimiter(env);
+
+    const createServer = () =>
+      createMcpServer({
+        env,
+        flags,
+        logger,
+        rateLimiter: rateLimiter!,
+      });
+
+    running = await runStreamableHttp({ env, flags, logger, createServer });
+    const url = `http://${env.mcpHost}:${env.mcpPort}/mcp`;
+
+    const initialize = await postJson(
+      url,
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion,
+          capabilities: { tools: {}, logging: {} },
+          clientInfo: { name: "integration-test", version: "0.1.0" },
+        },
+      },
+      {
+        "mcp-protocol-version": protocolVersion,
+      },
+    );
+
+    expect(initialize.payload.error).toBeUndefined();
+    const sessionId = initialize.response.headers.get("mcp-session-id");
+    expect(sessionId).toBeTruthy();
+
+    const delegate = await postJson(
+      url,
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: {
+          name: "workflow.delegate",
+          arguments: {
+            task: "Review the pending TypeScript changes for regressions.",
+            query: "typescript code review specialist",
+            limit: 3,
+          },
+        },
+      },
+      {
+        "mcp-session-id": String(sessionId),
+        "mcp-protocol-version": protocolVersion,
+      },
+    );
+
+    expect(delegate.payload.error).toBeUndefined();
+    expect(delegate.payload.result?.isError).toBe(true);
+    expect(delegate.payload.result?.structuredContent?.error?.message).toContain("upstream timeout");
+    expect(createSessionSpy).toHaveBeenCalledTimes(1);
+    expect(sendMessageSpy).toHaveBeenCalledTimes(1);
+  });
+
   test("returns 429 when the streamable HTTP request budget is exhausted", async () => {
-    const port = 3800 + Math.floor(Math.random() * 300);
+    const port = randomTestPort(30_500);
     const env: EnvConfig = {
       registryBrokerApiUrl: "https://example.com/registry/api/v1",
       registryBrokerApiKey: "integration-test-key",
@@ -499,7 +664,7 @@ describe("MCP HTTP tool calls", () => {
   });
 
   test("rate limits streamable HTTP requests before bearer auth", async () => {
-    const port = 3950 + Math.floor(Math.random() * 300);
+    const port = randomTestPort(30_700);
     const env: EnvConfig = {
       registryBrokerApiUrl: "https://example.com/registry/api/v1",
       registryBrokerApiKey: "integration-test-key",
@@ -578,7 +743,7 @@ describe("MCP HTTP tool calls", () => {
   });
 
   test("returns 429 when the legacy SSE request budget is exhausted", async () => {
-    const port = 4100 + Math.floor(Math.random() * 300);
+    const port = randomTestPort(30_900);
     const env: EnvConfig = {
       registryBrokerApiUrl: "https://example.com/registry/api/v1",
       registryBrokerApiKey: "integration-test-key",
@@ -654,7 +819,7 @@ describe("MCP HTTP tool calls", () => {
   });
 
   test("rate limits legacy SSE requests before bearer auth", async () => {
-    const port = 4250 + Math.floor(Math.random() * 300);
+    const port = randomTestPort(31_100);
     const env: EnvConfig = {
       registryBrokerApiUrl: "https://example.com/registry/api/v1",
       registryBrokerApiKey: "integration-test-key",

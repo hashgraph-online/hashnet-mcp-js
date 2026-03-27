@@ -45,16 +45,36 @@ jobs:
 
       - name: Check if publish is needed
         id: publish_check
+        shell: bash
         run: |
+          set -euo pipefail
           PKG_VERSION=$(node -p "require('./package.json').version")
-          PUBLISHED=$(npm view @hol-org/hashnet-mcp version 2>/dev/null || echo "0.0.0")
+          EXACT_PUBLISHED=$(npm view @hol-org/hashnet-mcp@"${PKG_VERSION}" version 2>/dev/null || true)
+          LATEST_PUBLISHED=$(npm view @hol-org/hashnet-mcp version 2>/dev/null || echo "")
           echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
-          if [ "$PKG_VERSION" = "$PUBLISHED" ]; then
+          echo "latest_version=$LATEST_PUBLISHED" >> "$GITHUB_OUTPUT"
+          if [ "$PKG_VERSION" = "$EXACT_PUBLISHED" ]; then
             echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "Version $PKG_VERSION already published (npm latest is $PUBLISHED)."
+            echo "Version $PKG_VERSION already exists on npm."
           else
             echo "publish=true" >> "$GITHUB_OUTPUT"
-            echo "Will publish $PKG_VERSION (npm latest is $PUBLISHED)."
+            echo "Will publish $PKG_VERSION (npm latest is ${LATEST_PUBLISHED:-none})."
+          fi
+
+      - name: Validate stable publish version ordering
+        if: steps.publish_check.outputs.publish == 'true' && steps.publish_check.outputs.latest_version != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkg_version="${{ steps.publish_check.outputs.version }}"
+          latest_version="${{ steps.publish_check.outputs.latest_version }}"
+
+          highest_version="$(printf '%s\n%s\n' "${pkg_version}" "${latest_version}" | sort -V | tail -n1)"
+          if [ "${highest_version}" != "${pkg_version}" ]; then
+            echo "Package version ${pkg_version} is lower than npm latest ${latest_version}." >&2
+            echo "Stable publish would fail because npm will not move the latest dist-tag backward." >&2
+            echo "Bump package.json to a version higher than ${latest_version}, or publish with an explicit non-latest dist-tag." >&2
+            exit 1
           fi
 
       - name: Publish to npm

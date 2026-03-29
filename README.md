@@ -121,3 +121,8 @@ GitHub releases are generated automatically from merged pull requests:
 - GitHub release notes are generated with GitHub's release-note engine
 - changelog categories are controlled via `.github/release.yml`
 - canonical docs links are appended to each release
+
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/hashgraph-online-hashnet-mcp-js).
+

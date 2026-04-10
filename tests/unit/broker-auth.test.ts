@@ -26,9 +26,15 @@ function createMockBrokerClient() {
     endSession: vi.fn(),
     fetchHistorySnapshot: vi.fn(),
     getDefaultHeaders: () => ({ ...headers }),
+    getGuardBillingBalance: vi.fn(),
+    getGuardEntitlements: vi.fn(),
+    getGuardRevocations: vi.fn(),
+    getGuardSession: vi.fn(),
+    getGuardTrustByHash: vi.fn(),
     getRegistrationQuote: vi.fn(),
     registerAgent: vi.fn(),
     resolveUaid: vi.fn(),
+    resolveGuardTrust: vi.fn(),
     search: vi.fn(),
     sendMessage: vi.fn(),
     setDefaultHeader: (name: string, value?: string | null) => {
@@ -46,6 +52,7 @@ function createMockBrokerClient() {
       headers["x-api-key"] = value;
     },
     stats: vi.fn(),
+    syncGuardReceipts: vi.fn(),
     vectorSearch: vi.fn(),
     waitForRegistrationCompletion: vi.fn(),
   };

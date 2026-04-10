@@ -4,6 +4,34 @@ const metadataValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 
 export const jsonRecordSchema = z.record(z.string(), z.unknown());
 export const emptyInputSchema = z.object({});
+const guardArtifactTypeSchema = z.enum(["skill", "plugin"]);
+const guardPolicyDecisionSchema = z.enum([
+  "allow",
+  "warn",
+  "block",
+  "review",
+  "require-reapproval",
+  "sandbox-required",
+]);
+const guardRecommendationSchema = z.enum(["monitor", "review", "block"]);
+const guardReceiptSchema = z.object({
+  receiptId: z.string().min(1),
+  capturedAt: z.string().min(1),
+  harness: z.string().min(1),
+  deviceId: z.string().min(1),
+  deviceName: z.string().min(1),
+  artifactId: z.string().min(1),
+  artifactName: z.string().min(1),
+  artifactType: guardArtifactTypeSchema,
+  artifactSlug: z.string().min(1),
+  artifactHash: z.string().min(1),
+  policyDecision: guardPolicyDecisionSchema,
+  recommendation: guardRecommendationSchema,
+  changedSinceLastApproval: z.boolean(),
+  publisher: z.string().optional(),
+  capabilities: z.array(z.string()),
+  summary: z.string().min(1),
+});
 export const agentAuthConfigSchema = z.object({
   type: z.enum(["bearer", "basic", "header", "apiKey"]).optional(),
   token: z.string().optional(),
@@ -120,6 +148,20 @@ export const holChatEndInputSchema = z.object({
   sessionId: z.string().min(1),
 });
 
+export const holGuardTrustByHashInputSchema = z.object({
+  sha256: z.string().min(1),
+});
+
+export const holGuardResolveTrustInputSchema = z.object({
+  ecosystem: z.string().optional(),
+  name: z.string().optional(),
+  version: z.string().optional(),
+});
+
+export const holGuardSyncReceiptsInputSchema = z.object({
+  receipts: z.array(guardReceiptSchema),
+});
+
 export const registrationPayloadSchema = z.object({
   profile: jsonRecordSchema,
   endpoint: z.string().optional(),
@@ -216,6 +258,53 @@ export const holChatEndOutputSchema = successEnvelopeSchema(
   z.object({
     sessionId: z.string(),
     ended: z.boolean(),
+  }),
+);
+
+export const holGuardSessionOutputSchema = successEnvelopeSchema(
+  z.object({
+    session: jsonRecordSchema,
+  }),
+);
+
+export const holGuardEntitlementsOutputSchema = successEnvelopeSchema(
+  z.object({
+    entitlements: jsonRecordSchema,
+  }),
+);
+
+export const holGuardBillingBalanceOutputSchema = successEnvelopeSchema(
+  z.object({
+    balance: jsonRecordSchema,
+  }),
+);
+
+export const holGuardTrustByHashOutputSchema = successEnvelopeSchema(
+  z.object({
+    trust: jsonRecordSchema,
+  }),
+);
+
+export const holGuardResolveTrustOutputSchema = successEnvelopeSchema(
+  z.object({
+    query: z.object({
+      ecosystem: z.string().optional(),
+      name: z.string().optional(),
+      version: z.string().optional(),
+    }),
+    trust: jsonRecordSchema,
+  }),
+);
+
+export const holGuardRevocationsOutputSchema = successEnvelopeSchema(
+  z.object({
+    revocations: jsonRecordSchema,
+  }),
+);
+
+export const holGuardSyncReceiptsOutputSchema = successEnvelopeSchema(
+  z.object({
+    sync: jsonRecordSchema,
   }),
 );
 

@@ -40,6 +40,21 @@ describe("CLI args", () => {
     expect(result.helpText).toContain("npx @hol-org/hashnet-mcp");
   });
 
+  test("accepts optional up subcommand", () => {
+    const result = parseCliArgs(["up", "--transport", "stdio"]);
+
+    expect(result.helpText).toBeUndefined();
+    expect(result.env).toEqual({
+      MCP_TRANSPORT: "stdio",
+    });
+  });
+
+  test("still rejects unknown positional arguments", () => {
+    expect(() => parseCliArgs(["start", "--transport", "stdio"])).toThrow(
+      /Unknown argument/,
+    );
+  });
+
   test("rejects invalid ports", () => {
     expect(() => parseCliArgs(["--port", "abc"])).toThrow(/positive integer/);
   });

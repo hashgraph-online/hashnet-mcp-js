@@ -541,4 +541,104 @@ describe("Guard MCP tools", () => {
     expect(getGuardSessionSpy).toHaveBeenCalledTimes(1);
     expect(getGuardEntitlementsSpy).toHaveBeenCalledTimes(1);
   });
+
+  test("returns a structured auth error for Guard session without paid auth", async () => {
+    const port = randomTestPort(31_700);
+    const env: EnvConfig = {
+      registryBrokerApiUrl: "https://example.com/registry/api/v1",
+      registryBrokerApiKey: undefined,
+      brokerRequestTimeoutMs: 10_000,
+      mcpTransport: "http",
+      mcpHost: "127.0.0.1",
+      mcpPort: port,
+      mcpAllowedOrigins: ["http://localhost:*", "http://127.0.0.1:*"],
+      mcpServerBearerToken: undefined,
+      mcpSessionIdleTtlMs: 60_000,
+      mcpSessionMaxCount: 10,
+      mcpSessionReapIntervalMs: 1_000,
+      logLevel: "silent",
+      brokerRateLimitConcurrency: 5,
+      brokerRateLimitMinTimeMs: 1,
+      ledgerAccountId: undefined,
+      hederaNetwork: undefined,
+      hederaAccountId: undefined,
+      hederaPrivateKey: undefined,
+      evmLedgerNetwork: undefined,
+      ethPrivateKey: undefined,
+      rbEncryptionPrivateKey: undefined,
+    };
+
+    const flags = {
+      featureLegacySse: false,
+      featureMemorySqlite: false,
+      featureMemoryRedis: false,
+      featureLedgerAuth: false,
+      featureEncryptedChat: false,
+    };
+
+    const logger = createLogger({ logLevel: "silent" });
+    rateLimiter = createBrokerRateLimiter(env);
+
+    running = await runStreamableHttp({
+      env,
+      flags,
+      logger,
+      createServer: () =>
+        createMcpServer({
+          env,
+          flags,
+          logger,
+          rateLimiter: rateLimiter!,
+        }),
+    });
+
+    const url = `http://${env.mcpHost}:${env.mcpPort}/mcp`;
+    const initialize = await postJson(
+      url,
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion,
+          capabilities: { tools: {}, logging: {} },
+          clientInfo: { name: "integration-test", version: "0.1.0" },
+        },
+      },
+      {
+        "mcp-protocol-version": protocolVersion,
+      },
+    );
+
+    const sessionId = initialize.response.headers.get("mcp-session-id");
+    expect(sessionId).toBeTruthy();
+
+    const headers = {
+      "mcp-session-id": String(sessionId),
+      "mcp-protocol-version": protocolVersion,
+    };
+
+    const sessionCall = await postJson(
+      url,
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: { name: "hol.guard.session", arguments: {} },
+      },
+      headers,
+    );
+
+    expect((sessionCall.payload.result as { isError?: boolean })?.isError).toBe(true);
+    expect(
+      (
+        sessionCall.payload.result as {
+          structuredContent?: { error?: { code?: string; category?: string } };
+        }
+      )?.structuredContent?.error,
+    ).toMatchObject({
+      code: "AUTH_REQUIRED",
+      category: "auth",
+    });
+  });
 });

@@ -46,14 +46,20 @@ export function registerGuardTools(server: McpServer, ctx: ToolRegisterContext):
       inputSchema: emptyInputSchema,
       outputSchema: holGuardSessionOutputSchema,
     },
-    async (_args, extra) =>
-      executeTool(ctx, extra, {
+    async (_args, extra) => {
+      const authError = ctx.requirePaidToolAuth("hol.guard.session");
+      if (authError) {
+        return authError;
+      }
+
+      return executeTool(ctx, extra, {
         toolName: "hol.guard.session",
         run: async (traceId) => ({
           session: await ctx.withBrokerAuth(traceId, "getGuardSession", (client) => client.getGuardSession()),
         }),
         summary: () => "Fetched Guard session state.",
-      }),
+      });
+    },
   );
 
   server.registerTool(
@@ -64,8 +70,13 @@ export function registerGuardTools(server: McpServer, ctx: ToolRegisterContext):
       inputSchema: emptyInputSchema,
       outputSchema: holGuardEntitlementsOutputSchema,
     },
-    async (_args, extra) =>
-      executeTool(ctx, extra, {
+    async (_args, extra) => {
+      const authError = ctx.requirePaidToolAuth("hol.guard.entitlements");
+      if (authError) {
+        return authError;
+      }
+
+      return executeTool(ctx, extra, {
         toolName: "hol.guard.entitlements",
         run: async (traceId) => ({
           entitlements: await ctx.withBrokerAuth(traceId, "getGuardEntitlements", (client) =>
@@ -73,7 +84,8 @@ export function registerGuardTools(server: McpServer, ctx: ToolRegisterContext):
           ),
         }),
         summary: () => "Fetched Guard entitlements.",
-      }),
+      });
+    },
   );
 
   server.registerTool(

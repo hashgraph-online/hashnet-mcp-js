@@ -14,6 +14,7 @@ import type { FeatureFlags } from "../config/featureFlags.js";
 import type { AppLogger } from "../observability/logger.js";
 import { SERVER_NAME, SERVER_VERSION } from "../constants.js";
 import { registerChatTools } from "./tools/chat.js";
+import { registerGuardTools } from "./tools/guard.js";
 import { errorResult } from "./tools/result.js";
 import { registerDiscoveryTools } from "./tools/discovery.js";
 import { registerRegistrationTools } from "./tools/registration.js";
@@ -128,6 +129,7 @@ export function createMcpServer(opts: CreateMcpServerOptions): McpServer {
   };
 
   registerDiscoveryTools(server, registerContext);
+  registerGuardTools(server, registerContext);
   registerChatTools(server, registerContext);
   registerRegistrationTools(server, registerContext);
   registerDelegateWorkflow(server, registerContext);

@@ -57,6 +57,13 @@ export type RegistryBrokerClientLike = {
   createSession: (
     payload: Record<string, unknown>,
   ) => Promise<{ sessionId: string } & Record<string, unknown>>;
+  getGuardSession: () => Promise<Record<string, unknown>>;
+  getGuardEntitlements: () => Promise<Record<string, unknown>>;
+  getGuardBillingBalance: () => Promise<Record<string, unknown>>;
+  getGuardTrustByHash: (sha256: string) => Promise<Record<string, unknown>>;
+  resolveGuardTrust: (query: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  getGuardRevocations: () => Promise<Record<string, unknown>>;
+  syncGuardReceipts: (payload: Record<string, unknown>) => Promise<Record<string, unknown>>;
   endSession: (sessionId: string) => Promise<void>;
   fetchHistorySnapshot: (
     sessionId: string,

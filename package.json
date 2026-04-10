@@ -57,7 +57,7 @@
     "prepack": "pnpm build"
   },
   "dependencies": {
-    "@hashgraphonline/standards-sdk": "^0.1.165",
+    "@hashgraphonline/standards-sdk": "^0.1.178",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "bottleneck": "^2.19.5",
     "dotenv": "^17.3.1",

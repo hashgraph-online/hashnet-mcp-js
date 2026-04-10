@@ -7,6 +7,7 @@ const HELP_TEXT = `HOL MCP Server
 
 Usage:
   npx @hol-org/hashnet-mcp [options]
+  npx @hol-org/hashnet-mcp up [options]
 
 Options:
   --transport <stdio|http>       Select MCP transport
@@ -46,10 +47,14 @@ function parsePort(value: string): string {
 }
 
 export function parseCliArgs(argv: string[]): CliParseResult {
+  const normalizedArgv =
+    argv[0] === "up"
+      ? argv.slice(1)
+      : argv;
   const env: Record<string, string> = {};
 
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
+  for (let index = 0; index < normalizedArgv.length; index += 1) {
+    const arg = normalizedArgv[index];
 
     switch (arg) {
       case "--help":
@@ -58,7 +63,7 @@ export function parseCliArgs(argv: string[]): CliParseResult {
           helpText: HELP_TEXT,
         };
       case "--transport": {
-        const value = requireValue(argv, index + 1, "--transport");
+        const value = requireValue(normalizedArgv, index + 1, "--transport");
         if (value !== "stdio" && value !== "http") {
           throw new Error(`--transport must be "stdio" or "http", received "${value}"`);
         }
@@ -73,27 +78,39 @@ export function parseCliArgs(argv: string[]): CliParseResult {
         env.MCP_TRANSPORT = "http";
         break;
       case "--host":
-        env.MCP_HOST = requireValue(argv, index + 1, "--host");
+        env.MCP_HOST = requireValue(normalizedArgv, index + 1, "--host");
         index += 1;
         break;
       case "--port":
-        env.MCP_PORT = parsePort(requireValue(argv, index + 1, "--port"));
+        env.MCP_PORT = parsePort(requireValue(normalizedArgv, index + 1, "--port"));
         index += 1;
         break;
       case "--allowed-origins":
-        env.MCP_ALLOWED_ORIGINS = requireValue(argv, index + 1, "--allowed-origins");
+        env.MCP_ALLOWED_ORIGINS = requireValue(
+          normalizedArgv,
+          index + 1,
+          "--allowed-origins",
+        );
         index += 1;
         break;
       case "--broker-url":
-        env.REGISTRY_BROKER_API_URL = requireValue(argv, index + 1, "--broker-url");
+        env.REGISTRY_BROKER_API_URL = requireValue(
+          normalizedArgv,
+          index + 1,
+          "--broker-url",
+        );
         index += 1;
         break;
       case "--bearer-token":
-        env.MCP_SERVER_BEARER_TOKEN = requireValue(argv, index + 1, "--bearer-token");
+        env.MCP_SERVER_BEARER_TOKEN = requireValue(
+          normalizedArgv,
+          index + 1,
+          "--bearer-token",
+        );
         index += 1;
         break;
       case "--log-level":
-        env.LOG_LEVEL = requireValue(argv, index + 1, "--log-level");
+        env.LOG_LEVEL = requireValue(normalizedArgv, index + 1, "--log-level");
         index += 1;
         break;
       case "--legacy-sse":

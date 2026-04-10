@@ -8,6 +8,11 @@ import { createLogger } from "../../src/observability/logger.js";
 import { runStreamableHttp, type RunningHttpServer } from "../../src/transports/httpStreamable.js";
 
 const protocolVersion = "2025-06-18";
+const testPortStride = 100;
+
+function randomTestPort(base: number): number {
+  return base + Math.floor(Math.random() * testPortStride);
+}
 
 async function postJson(
   url: string,
@@ -135,7 +140,7 @@ describe("Guard MCP tools", () => {
       },
       evidence: ["published release"],
     });
-    vi.spyOn(
+    const resolveGuardTrustSpy = vi.spyOn(
       BrokerCtor.prototype as { resolveGuardTrust: (query: Record<string, unknown>) => Promise<unknown> },
       "resolveGuardTrust",
     ).mockResolvedValue({
@@ -176,7 +181,7 @@ describe("Guard MCP tools", () => {
       receiptsStored: 1,
     });
 
-    const port = 31_300;
+    const port = randomTestPort(31_300);
     const env: EnvConfig = {
       registryBrokerApiUrl: "https://example.com/registry/api/v1",
       registryBrokerApiKey: "integration-test-key",
@@ -269,7 +274,7 @@ describe("Guard MCP tools", () => {
         method: "tools/call",
         params: {
           name: "hol.guard.resolveTrust",
-          arguments: { ecosystem: "mcp", name: "hashnet-mcp", version: "1.0.0" },
+          arguments: { ecosystem: " ", name: "hashnet-mcp", version: "1.0.0" },
         },
       },
       headers,
@@ -369,5 +374,171 @@ describe("Guard MCP tools", () => {
     expect(sessionData?.session?.principal?.signedIn).toBe(false);
     expect(billingData?.balance?.buckets?.[0]?.availableCredits).toBe(420);
     expect(syncData?.sync?.receiptsStored).toBe(1);
+    expect(resolveGuardTrustSpy).toHaveBeenCalledWith({
+      name: "hashnet-mcp",
+      version: "1.0.0",
+    });
+  });
+
+  test("authenticates Guard session and entitlements when ledger auth is configured", async () => {
+    const BrokerCtor = (standardsSdk as Record<string, unknown>).RegistryBrokerClient as {
+      prototype: Record<string, unknown>;
+    };
+
+    const authenticateWithLedgerCredentialsSpy = vi
+      .spyOn(
+        BrokerCtor.prototype as {
+          authenticateWithLedgerCredentials: (options: Record<string, unknown>) => Promise<unknown>;
+        },
+        "authenticateWithLedgerCredentials",
+      )
+      .mockResolvedValue({
+        key: "issued-ledger-key",
+        accountId: "0.0.12345",
+        network: "hedera:testnet",
+        apiKey: {
+          prefix: "issued",
+          lastFour: "1234",
+        },
+      });
+    const getGuardSessionSpy = vi
+      .spyOn(BrokerCtor.prototype as { getGuardSession: () => Promise<unknown> }, "getGuardSession")
+      .mockResolvedValue({
+        principal: { signedIn: true, roles: ["user"] },
+        entitlements: {
+          planId: "pro",
+          includedMonthlyCredits: 1000,
+          deviceLimit: 3,
+          retentionDays: 30,
+          syncEnabled: true,
+          premiumFeedsEnabled: true,
+          teamPolicyEnabled: false,
+        },
+        balance: { accountId: "0.0.12345", availableCredits: 420 },
+        bucketingMode: "product-bucketed",
+        buckets: [],
+      });
+    const getGuardEntitlementsSpy = vi
+      .spyOn(
+        BrokerCtor.prototype as { getGuardEntitlements: () => Promise<unknown> },
+        "getGuardEntitlements",
+      )
+      .mockResolvedValue({
+        principal: { signedIn: true, roles: ["user"] },
+        entitlements: {
+          planId: "pro",
+          includedMonthlyCredits: 1000,
+          deviceLimit: 3,
+          retentionDays: 30,
+          syncEnabled: true,
+          premiumFeedsEnabled: true,
+          teamPolicyEnabled: false,
+        },
+        balance: { accountId: "0.0.12345", availableCredits: 420 },
+        bucketingMode: "product-bucketed",
+        buckets: [],
+      });
+
+    const port = randomTestPort(31_500);
+    const env: EnvConfig = {
+      registryBrokerApiUrl: "https://example.com/registry/api/v1",
+      registryBrokerApiKey: undefined,
+      brokerRequestTimeoutMs: 10_000,
+      mcpTransport: "http",
+      mcpHost: "127.0.0.1",
+      mcpPort: port,
+      mcpAllowedOrigins: ["http://localhost:*", "http://127.0.0.1:*"],
+      mcpServerBearerToken: undefined,
+      mcpSessionIdleTtlMs: 60_000,
+      mcpSessionMaxCount: 10,
+      mcpSessionReapIntervalMs: 1_000,
+      logLevel: "silent",
+      brokerRateLimitConcurrency: 5,
+      brokerRateLimitMinTimeMs: 1,
+      ledgerAccountId: "0.0.12345",
+      hederaNetwork: "hedera:testnet",
+      hederaAccountId: "0.0.12345",
+      hederaPrivateKey: "hedera-private-key",
+      evmLedgerNetwork: undefined,
+      ethPrivateKey: undefined,
+      rbEncryptionPrivateKey: undefined,
+    };
+
+    const flags = {
+      featureLegacySse: false,
+      featureMemorySqlite: false,
+      featureMemoryRedis: false,
+      featureLedgerAuth: true,
+      featureEncryptedChat: false,
+    };
+
+    const logger = createLogger({ logLevel: "silent" });
+    rateLimiter = createBrokerRateLimiter(env);
+
+    running = await runStreamableHttp({
+      env,
+      flags,
+      logger,
+      createServer: () =>
+        createMcpServer({
+          env,
+          flags,
+          logger,
+          rateLimiter: rateLimiter!,
+        }),
+    });
+
+    const url = `http://${env.mcpHost}:${env.mcpPort}/mcp`;
+    const initialize = await postJson(
+      url,
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion,
+          capabilities: { tools: {}, logging: {} },
+          clientInfo: { name: "integration-test", version: "0.1.0" },
+        },
+      },
+      {
+        "mcp-protocol-version": protocolVersion,
+      },
+    );
+
+    const sessionId = initialize.response.headers.get("mcp-session-id");
+    expect(sessionId).toBeTruthy();
+
+    const headers = {
+      "mcp-session-id": String(sessionId),
+      "mcp-protocol-version": protocolVersion,
+    };
+
+    const sessionCall = await postJson(
+      url,
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: { name: "hol.guard.session", arguments: {} },
+      },
+      headers,
+    );
+    const entitlementsCall = await postJson(
+      url,
+      {
+        jsonrpc: "2.0",
+        id: 3,
+        method: "tools/call",
+        params: { name: "hol.guard.entitlements", arguments: {} },
+      },
+      headers,
+    );
+
+    expect((sessionCall.payload.result as { isError?: boolean })?.isError).not.toBe(true);
+    expect((entitlementsCall.payload.result as { isError?: boolean })?.isError).not.toBe(true);
+    expect(authenticateWithLedgerCredentialsSpy).toHaveBeenCalledTimes(1);
+    expect(getGuardSessionSpy).toHaveBeenCalledTimes(1);
+    expect(getGuardEntitlementsSpy).toHaveBeenCalledTimes(1);
   });
 });

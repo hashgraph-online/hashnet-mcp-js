@@ -17,6 +17,26 @@ import { executeTool, traceIdFrom } from "./execute.js";
 import { errorResult } from "./result.js";
 import type { ToolRegisterContext } from "./types.js";
 
+function normalizeGuardTrustQuery(args: {
+  ecosystem?: string;
+  name?: string;
+  version?: string;
+}): {
+  ecosystem?: string;
+  name?: string;
+  version?: string;
+} {
+  const ecosystem = args.ecosystem?.trim();
+  const name = args.name?.trim();
+  const version = args.version?.trim();
+
+  return {
+    ...(ecosystem ? { ecosystem } : {}),
+    ...(name ? { name } : {}),
+    ...(version ? { version } : {}),
+  };
+}
+
 export function registerGuardTools(server: McpServer, ctx: ToolRegisterContext): void {
   server.registerTool(
     "hol.guard.session",
@@ -30,7 +50,7 @@ export function registerGuardTools(server: McpServer, ctx: ToolRegisterContext):
       executeTool(ctx, extra, {
         toolName: "hol.guard.session",
         run: async (traceId) => ({
-          session: await ctx.withBroker(traceId, "getGuardSession", (client) => client.getGuardSession()),
+          session: await ctx.withBrokerAuth(traceId, "getGuardSession", (client) => client.getGuardSession()),
         }),
         summary: () => "Fetched Guard session state.",
       }),
@@ -48,7 +68,7 @@ export function registerGuardTools(server: McpServer, ctx: ToolRegisterContext):
       executeTool(ctx, extra, {
         toolName: "hol.guard.entitlements",
         run: async (traceId) => ({
-          entitlements: await ctx.withBroker(traceId, "getGuardEntitlements", (client) =>
+          entitlements: await ctx.withBrokerAuth(traceId, "getGuardEntitlements", (client) =>
             client.getGuardEntitlements(),
           ),
         }),
@@ -111,7 +131,8 @@ export function registerGuardTools(server: McpServer, ctx: ToolRegisterContext):
       outputSchema: holGuardResolveTrustOutputSchema,
     },
     async (args, extra) => {
-      const hasQuery = Boolean(args.ecosystem || args.name || args.version);
+      const query = normalizeGuardTrustQuery(args);
+      const hasQuery = Object.keys(query).length > 0;
       if (!hasQuery) {
         return errorResult(
           "hol.guard.resolveTrust requires at least one of 'ecosystem', 'name', or 'version'",
@@ -127,12 +148,10 @@ export function registerGuardTools(server: McpServer, ctx: ToolRegisterContext):
       return executeTool(ctx, extra, {
         toolName: "hol.guard.resolveTrust",
         run: async (traceId) => ({
-          query: {
-            ...(args.ecosystem ? { ecosystem: args.ecosystem } : {}),
-            ...(args.name ? { name: args.name } : {}),
-            ...(args.version ? { version: args.version } : {}),
-          },
-          trust: await ctx.withBroker(traceId, "resolveGuardTrust", (client) => client.resolveGuardTrust(args)),
+          query,
+          trust: await ctx.withBroker(traceId, "resolveGuardTrust", (client) =>
+            client.resolveGuardTrust(query),
+          ),
         }),
         summary: () => "Resolved Guard trust recommendations.",
       });

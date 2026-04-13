@@ -71,8 +71,7 @@ export const summarizeGuardCanaryDrift = (
   const candidateTools = toSortedUniqueList((candidateMcp?.tools ?? []).map((tool) => tool.name));
   const capabilityDiff = diffLists(baselineCapabilities, candidateCapabilities);
   const toolDiff = diffLists(baselineTools, candidateTools);
-  const domainChanged =
-    baselineDomain !== null && candidateDomain !== null ? baselineDomain !== candidateDomain : baselineDomain !== candidateDomain;
+  const domainChanged = baselineDomain !== candidateDomain;
   return {
     baselineDomain,
     candidateDomain,

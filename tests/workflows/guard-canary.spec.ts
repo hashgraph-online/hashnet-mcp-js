@@ -1,7 +1,32 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { summarizeGuardCanaryDrift, type GuardCanaryRegistration } from '../../src/workflows/guard-canary';
+
+const guardCanaryRegistrationSchema = z.object({
+  profile: z
+    .object({
+      mcpServer: z
+        .object({
+          capabilities: z.array(z.string()).optional(),
+          connectionInfo: z
+            .object({
+              url: z.string().optional(),
+            })
+            .optional(),
+          tools: z
+            .array(
+              z.object({
+                name: z.string().optional(),
+              }),
+            )
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
 
 const fixtureDir = path.resolve(
   path.dirname(new URL(import.meta.url).pathname),
@@ -11,7 +36,9 @@ const fixtureDir = path.resolve(
 );
 
 const readFixture = async (fileName: string): Promise<GuardCanaryRegistration> =>
-  JSON.parse(await readFile(path.join(fixtureDir, fileName), 'utf8')) as GuardCanaryRegistration;
+  guardCanaryRegistrationSchema.parse(
+    JSON.parse(await readFile(path.join(fixtureDir, fileName), 'utf8')),
+  );
 
 describe('guard canary manifest drift', () => {
   it('keeps the safe baseline in the safe state', async () => {

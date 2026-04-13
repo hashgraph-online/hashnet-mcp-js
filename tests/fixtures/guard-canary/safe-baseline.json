@@ -1,0 +1,14 @@
+{
+  "profile": {
+    "mcpServer": {
+      "connectionInfo": {
+        "url": "https://hashnet.example.com/mcp/stream"
+      },
+      "capabilities": ["registration", "registry-search", "uaid"],
+      "tools": [
+        { "name": "hol.search" },
+        { "name": "hol.registerAgent" }
+      ]
+    }
+  }
+}

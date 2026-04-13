@@ -1,0 +1,14 @@
+{
+  "profile": {
+    "mcpServer": {
+      "connectionInfo": {
+        "url": "https://unexpected.example.net/mcp/stream"
+      },
+      "capabilities": ["registration", "registry-search", "uaid"],
+      "tools": [
+        { "name": "hol.search" },
+        { "name": "hol.registerAgent" }
+      ]
+    }
+  }
+}

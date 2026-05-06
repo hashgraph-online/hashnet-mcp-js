@@ -18,6 +18,14 @@ import { executeTool, traceIdFrom } from "./execute.js";
 import { errorResult } from "./result.js";
 import type { ToolRegisterContext } from "./types.js";
 
+function readSessionState(value: unknown): string | undefined {
+  if (typeof value !== "object" || value === null || !("state" in value)) {
+    return undefined;
+  }
+  const state = (value as { state?: unknown }).state;
+  return typeof state === "string" ? state : undefined;
+}
+
 export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): void {
   server.registerTool(
     "hol.chat.readiness",
@@ -195,20 +203,26 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
 
       return executeTool(ctx, extra, {
         toolName: "hol.chat.retry",
-        run: async (traceId) => ({
-          sessionId: args.sessionId,
-          response: await ctx.withBrokerAuth(traceId, "retryMessage", (client) =>
-            client.retryMessage(args.messageId, {
-              sessionId: args.sessionId,
-              uaid: args.uaid,
-              agentUrl: args.agentUrl,
-              auth: args.auth,
-              senderUaid: args.senderUaid,
-              message: args.message,
-              idempotencyKey: args.idempotencyKey,
-            }),
-          ),
-        }),
+        run: async (traceId) => {
+          const retryIdentifier = args.messageId ?? args.idempotencyKey;
+          if (!retryIdentifier) {
+            throw new Error("hol.chat.retry requires either 'messageId' or 'idempotencyKey'");
+          }
+          return {
+            sessionId: args.sessionId,
+            response: await ctx.withBrokerAuth(traceId, "retryMessage", (client) =>
+              client.retryMessage(retryIdentifier, {
+                sessionId: args.sessionId,
+                uaid: args.uaid,
+                agentUrl: args.agentUrl,
+                auth: args.auth,
+                senderUaid: args.senderUaid,
+                message: args.message,
+                idempotencyKey: args.idempotencyKey,
+              }),
+            ),
+          };
+        },
         summary: (data) => `Retried HOL chat message for session ${data.sessionId}.`,
       });
     },
@@ -263,7 +277,7 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
           );
           return {
             sessionId: args.sessionId,
-            state: typeof cancelled.state === "string" ? cancelled.state : undefined,
+            state: readSessionState(cancelled),
             ended: true,
           };
         },
@@ -292,7 +306,7 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
           const ended = await ctx.withBrokerAuth(traceId, "endSession", (client) => client.endSession(args.sessionId));
           return {
             sessionId: args.sessionId,
-            state: typeof ended.state === "string" ? ended.state : undefined,
+            state: readSessionState(ended),
             ended: true,
           };
         },

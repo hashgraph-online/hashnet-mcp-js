@@ -7,6 +7,10 @@ import {
   holChatEndOutputSchema,
   holChatHistoryInputSchema,
   holChatHistoryOutputSchema,
+  holChatReadinessInputSchema,
+  holChatReadinessOutputSchema,
+  holChatRetryInputSchema,
+  holChatRetryOutputSchema,
   holChatSendMessageInputSchema,
   holChatSendMessageOutputSchema,
 } from "../schemas/common.js";
@@ -15,6 +19,47 @@ import { errorResult } from "./result.js";
 import type { ToolRegisterContext } from "./types.js";
 
 export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): void {
+  server.registerTool(
+    "hol.chat.readiness",
+    {
+      title: "Check Chat Readiness",
+      description: "Check Broker chat route readiness by UAID or agent URL before opening a session",
+      inputSchema: holChatReadinessInputSchema,
+      outputSchema: holChatReadinessOutputSchema,
+    },
+    async (args, extra) => {
+      const authError = ctx.requirePaidToolAuth("hol.chat.readiness");
+      if (authError) {
+        return authError;
+      }
+
+      if (!args.uaid && !args.agentUrl) {
+        return errorResult("hol.chat.readiness requires either 'uaid' or 'agentUrl'", undefined, {
+          code: "VALIDATION_ERROR",
+          category: "validation",
+          traceId: traceIdFrom(extra),
+        });
+      }
+
+      const payload: Record<string, unknown> = {};
+      if (args.uaid) {
+        payload.uaid = args.uaid;
+      } else {
+        payload.agentUrl = args.agentUrl;
+      }
+
+      return executeTool(ctx, extra, {
+        toolName: "hol.chat.readiness",
+        run: async (traceId) => ({
+          readiness: await ctx.withBrokerAuth(traceId, "checkChatReadiness", (client) =>
+            client.checkChatReadiness(payload),
+          ),
+        }),
+        summary: () => "Checked HOL chat readiness.",
+      });
+    },
+  );
+
   server.registerTool(
     "hol.chat.createSession",
     {
@@ -42,6 +87,7 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
         senderUaid: args.senderUaid,
         historyTtlSeconds: args.historyTtlSeconds,
         encryptionRequested: args.encryptionRequested,
+        visibility: args.visibility,
       };
 
       if (args.uaid) {
@@ -97,6 +143,7 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
               senderUaid: args.senderUaid,
               historyTtlSeconds: args.historyTtlSeconds,
               encryptionRequested: args.encryptionRequested,
+              visibility: args.visibility,
             };
 
             if (args.uaid) {
@@ -119,11 +166,48 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
                 message: args.message,
                 streaming: args.streaming,
                 auth: args.auth,
+                senderUaid: args.senderUaid,
+                idempotencyKey: args.idempotencyKey,
+                transport: args.transport,
               }),
             ),
           };
         },
         summary: (data) => `Sent message to HOL chat session ${data.sessionId}.`,
+      });
+    },
+  );
+
+  server.registerTool(
+    "hol.chat.retry",
+    {
+      title: "Retry Chat Message",
+      description: "Replay a persisted chat message by idempotency key without duplicating history",
+      inputSchema: holChatRetryInputSchema,
+      outputSchema: holChatRetryOutputSchema,
+    },
+    async (args, extra) => {
+      const authError = ctx.requirePaidToolAuth("hol.chat.retry");
+      if (authError) {
+        return authError;
+      }
+
+      return executeTool(ctx, extra, {
+        toolName: "hol.chat.retry",
+        run: async (traceId) => ({
+          sessionId: args.sessionId,
+          response: await ctx.withBrokerAuth(traceId, "retryMessage", (client) =>
+            client.retryMessage(args.messageId, {
+              sessionId: args.sessionId,
+              uaid: args.uaid,
+              agentUrl: args.agentUrl,
+              auth: args.auth,
+              message: args.message,
+              idempotencyKey: args.idempotencyKey,
+            }),
+          ),
+        }),
+        summary: (data) => `Retried HOL chat message for session ${data.sessionId}.`,
       });
     },
   );
@@ -156,6 +240,37 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
   );
 
   server.registerTool(
+    "hol.chat.cancel",
+    {
+      title: "Cancel Chat Session",
+      description: "Cancel a chat session while returning a terminal session state",
+      inputSchema: holChatEndInputSchema,
+      outputSchema: holChatEndOutputSchema,
+    },
+    async (args, extra) => {
+      const authError = ctx.requirePaidToolAuth("hol.chat.cancel");
+      if (authError) {
+        return authError;
+      }
+
+      return executeTool(ctx, extra, {
+        toolName: "hol.chat.cancel",
+        run: async (traceId) => {
+          const cancelled = await ctx.withBrokerAuth(traceId, "cancelSession", (client) =>
+            client.cancelSession(args.sessionId),
+          );
+          return {
+            sessionId: args.sessionId,
+            state: typeof cancelled.state === "string" ? cancelled.state : undefined,
+            ended: true,
+          };
+        },
+        summary: (data) => `Cancelled chat session ${data.sessionId}.`,
+      });
+    },
+  );
+
+  server.registerTool(
     "hol.chat.end",
     {
       title: "End Chat Session",
@@ -172,9 +287,10 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
       return executeTool(ctx, extra, {
         toolName: "hol.chat.end",
         run: async (traceId) => {
-          await ctx.withBrokerAuth(traceId, "endSession", (client) => client.endSession(args.sessionId));
+          const ended = await ctx.withBrokerAuth(traceId, "endSession", (client) => client.endSession(args.sessionId));
           return {
             sessionId: args.sessionId,
+            state: typeof ended.state === "string" ? ended.state : undefined,
             ended: true,
           };
         },

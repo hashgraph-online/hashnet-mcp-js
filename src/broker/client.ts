@@ -57,6 +57,7 @@ export type RegistryBrokerClientLike = {
   createSession: (
     payload: Record<string, unknown>,
   ) => Promise<{ sessionId: string } & Record<string, unknown>>;
+  checkChatReadiness: (payload: Record<string, unknown>) => Promise<Record<string, unknown>>;
   getGuardSession: () => Promise<Record<string, unknown>>;
   getGuardEntitlements: () => Promise<Record<string, unknown>>;
   getGuardBillingBalance: () => Promise<Record<string, unknown>>;
@@ -64,7 +65,8 @@ export type RegistryBrokerClientLike = {
   resolveGuardTrust: (query: Record<string, unknown>) => Promise<Record<string, unknown>>;
   getGuardRevocations: () => Promise<Record<string, unknown>>;
   syncGuardReceipts: (payload: Record<string, unknown>) => Promise<Record<string, unknown>>;
-  endSession: (sessionId: string) => Promise<void>;
+  cancelSession: (sessionId: string) => Promise<Record<string, unknown>>;
+  endSession: (sessionId: string) => Promise<Record<string, unknown>>;
   fetchHistorySnapshot: (
     sessionId: string,
     options?: Record<string, unknown>,
@@ -74,6 +76,10 @@ export type RegistryBrokerClientLike = {
   resolveUaid: (uaid: string) => Promise<Record<string, unknown>>;
   search: (params?: Record<string, unknown>) => Promise<{ hits?: Array<Record<string, unknown>> } & Record<string, unknown>>;
   sendMessage: (payload: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  retryMessage: (
+    messageId: string,
+    payload: Record<string, unknown>,
+  ) => Promise<Record<string, unknown>>;
   stats: () => Promise<Record<string, unknown>>;
   vectorSearch: (
     request: Record<string, unknown>,

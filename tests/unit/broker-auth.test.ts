@@ -21,7 +21,9 @@ function createMockBrokerClient() {
         lastFour: "1234",
         createdAt: "2026-03-13T00:00:00.000Z",
       },
-    }),
+     }),
+    checkChatReadiness: vi.fn(),
+    cancelSession: vi.fn(),
     createSession: vi.fn(),
     endSession: vi.fn(),
     fetchHistorySnapshot: vi.fn(),
@@ -37,6 +39,7 @@ function createMockBrokerClient() {
     resolveGuardTrust: vi.fn(),
     search: vi.fn(),
     sendMessage: vi.fn(),
+    retryMessage: vi.fn(),
     setDefaultHeader: (name: string, value?: string | null) => {
       if (!value) {
         delete headers[name];

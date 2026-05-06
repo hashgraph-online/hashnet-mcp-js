@@ -182,7 +182,8 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
     "hol.chat.retry",
     {
       title: "Retry Chat Message",
-      description: "Replay a persisted chat message by idempotency key without duplicating history",
+      description:
+        "Replay a persisted chat message by message ID or idempotency key without duplicating history",
       inputSchema: holChatRetryInputSchema,
       outputSchema: holChatRetryOutputSchema,
     },
@@ -202,6 +203,7 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
               uaid: args.uaid,
               agentUrl: args.agentUrl,
               auth: args.auth,
+              senderUaid: args.senderUaid,
               message: args.message,
               idempotencyKey: args.idempotencyKey,
             }),

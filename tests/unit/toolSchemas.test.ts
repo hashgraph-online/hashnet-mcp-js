@@ -67,6 +67,7 @@ describe("tool schemas", () => {
         messageId: "idem-1",
         sessionId: "session-1",
         message: "hello",
+        senderUaid: "uaid:sender",
       }).success,
     ).toBe(true);
     expect(holChatHistoryInputSchema.safeParse({ sessionId: "session-1" }).success).toBe(true);

@@ -155,6 +155,7 @@ export const holChatRetryInputSchema = z.object({
   uaid: z.string().optional(),
   agentUrl: z.string().optional(),
   auth: agentAuthConfigSchema.optional(),
+  senderUaid: z.string().optional(),
   message: z.string().min(1),
   idempotencyKey: z.string().min(1).optional(),
 });

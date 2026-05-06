@@ -126,6 +126,12 @@ export const holChatCreateSessionInputSchema = z.object({
   senderUaid: z.string().optional(),
   historyTtlSeconds: z.number().int().positive().optional(),
   encryptionRequested: z.boolean().optional(),
+  visibility: z.enum(["private", "public"]).optional(),
+});
+
+export const holChatReadinessInputSchema = z.object({
+  uaid: z.string().optional(),
+  agentUrl: z.string().optional(),
 });
 
 export const holChatSendMessageInputSchema = z.object({
@@ -136,9 +142,28 @@ export const holChatSendMessageInputSchema = z.object({
   senderUaid: z.string().optional(),
   historyTtlSeconds: z.number().int().positive().optional(),
   encryptionRequested: z.boolean().optional(),
+  visibility: z.enum(["private", "public"]).optional(),
   message: z.string().min(1),
   streaming: z.boolean().optional(),
+  idempotencyKey: z.string().min(1).optional(),
+  transport: z.enum(["xmtp", "moltbook", "http", "a2a", "acp"]).optional(),
 });
+
+export const holChatRetryInputSchema = z
+  .object({
+    messageId: z.string().min(1).optional(),
+    sessionId: z.string().min(1),
+    uaid: z.string().optional(),
+    agentUrl: z.string().optional(),
+    auth: agentAuthConfigSchema.optional(),
+    senderUaid: z.string().optional(),
+    message: z.string().min(1),
+    idempotencyKey: z.string().min(1).optional(),
+  })
+  .refine((value) => Boolean(value.messageId ?? value.idempotencyKey), {
+    message: "messageId or idempotencyKey is required",
+    path: ["messageId"],
+  });
 
 export const holChatHistoryInputSchema = z.object({
   sessionId: z.string().min(1),
@@ -240,6 +265,12 @@ export const holChatCreateSessionOutputSchema = successEnvelopeSchema(
   }),
 );
 
+export const holChatReadinessOutputSchema = successEnvelopeSchema(
+  z.object({
+    readiness: jsonRecordSchema,
+  }),
+);
+
 export const holChatSendMessageOutputSchema = successEnvelopeSchema(
   z.object({
     sessionId: z.string(),
@@ -254,9 +285,17 @@ export const holChatHistoryOutputSchema = successEnvelopeSchema(
   }),
 );
 
+export const holChatRetryOutputSchema = successEnvelopeSchema(
+  z.object({
+    sessionId: z.string(),
+    response: jsonRecordSchema,
+  }),
+);
+
 export const holChatEndOutputSchema = successEnvelopeSchema(
   z.object({
     sessionId: z.string(),
+    state: z.string().optional(),
     ended: z.boolean(),
   }),
 );

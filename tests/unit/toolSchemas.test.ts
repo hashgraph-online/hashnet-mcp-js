@@ -8,6 +8,10 @@ import {
   holChatEndOutputSchema,
   holChatHistoryInputSchema,
   holChatHistoryOutputSchema,
+  holChatReadinessInputSchema,
+  holChatReadinessOutputSchema,
+  holChatRetryInputSchema,
+  holChatRetryOutputSchema,
   holChatSendMessageInputSchema,
   holChatSendMessageOutputSchema,
   holResolveUaidInputSchema,
@@ -53,6 +57,17 @@ describe("tool schemas", () => {
         senderUaid: "uaid:sender",
         historyTtlSeconds: 300,
         encryptionRequested: true,
+        idempotencyKey: "idem-1",
+        transport: "a2a",
+      }).success,
+    ).toBe(true);
+    expect(holChatReadinessInputSchema.safeParse({ uaid: "uaid:abc" }).success).toBe(true);
+    expect(
+      holChatRetryInputSchema.safeParse({
+        messageId: "idem-1",
+        sessionId: "session-1",
+        message: "hello",
+        senderUaid: "uaid:sender",
       }).success,
     ).toBe(true);
     expect(holChatHistoryInputSchema.safeParse({ sessionId: "session-1" }).success).toBe(true);
@@ -123,6 +138,13 @@ describe("tool schemas", () => {
       }).success,
     ).toBe(true);
     expect(
+      holChatReadinessOutputSchema.safeParse({
+        ok: true,
+        data: { readiness: { status: "responsive" } },
+        meta,
+      }).success,
+    ).toBe(true);
+    expect(
       holChatSendMessageOutputSchema.safeParse({
         ok: true,
         data: { sessionId: "s1", response: { id: "msg-1" } },
@@ -137,9 +159,16 @@ describe("tool schemas", () => {
       }).success,
     ).toBe(true);
     expect(
+      holChatRetryOutputSchema.safeParse({
+        ok: true,
+        data: { sessionId: "s1", response: { idempotent: true } },
+        meta,
+      }).success,
+    ).toBe(true);
+    expect(
       holChatEndOutputSchema.safeParse({
         ok: true,
-        data: { sessionId: "s1", ended: true },
+        data: { sessionId: "s1", ended: true, state: "ended" },
         meta,
       }).success,
     ).toBe(true);

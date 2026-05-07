@@ -27,6 +27,7 @@ function createMockBrokerClient() {
     createSession: vi.fn(),
     endSession: vi.fn(),
     fetchHistorySnapshot: vi.fn(),
+    resumeSession: vi.fn(),
     getDefaultHeaders: () => ({ ...headers }),
     getGuardBillingBalance: vi.fn(),
     getGuardEntitlements: vi.fn(),

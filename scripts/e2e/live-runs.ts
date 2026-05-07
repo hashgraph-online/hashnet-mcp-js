@@ -226,8 +226,10 @@ async function run(): Promise<void> {
     process.stdout.write(`   selected UAID: ${targetUaid}\n`);
 
     process.stdout.write("2) hol.chat.createSession live run...\n");
+    const sessionIdempotencyKey = `live-run-session-${Date.now()}`;
     const createdSession = await callTool(3, "hol.chat.createSession", {
       uaid: targetUaid,
+      idempotencyKey: sessionIdempotencyKey,
     });
 
     const chatSessionId = readPath(createdSession, ["session", "sessionId"]);
@@ -236,26 +238,49 @@ async function run(): Promise<void> {
     }
     process.stdout.write(`   chat sessionId: ${chatSessionId}\n`);
 
-    process.stdout.write("3) hol.chat.sendMessage live run...\n");
-    const sentMessage = await callTool(4, "hol.chat.sendMessage", {
+    const duplicateSession = await callTool(4, "hol.chat.createSession", {
+      uaid: targetUaid,
+      idempotencyKey: sessionIdempotencyKey,
+    });
+    const duplicateChatSessionId = readPath(duplicateSession, ["session", "sessionId"]);
+    if (duplicateChatSessionId !== chatSessionId) {
+      throw new Error("hol.chat.createSession idempotency did not return the same sessionId");
+    }
+
+    process.stdout.write("3) hol.chat.readiness live run...\n");
+    const readiness = await callTool(5, "hol.chat.readiness", {
+      uaid: targetUaid,
+      forceRefresh: true,
+    });
+    process.stdout.write(`   readiness response keys: ${Object.keys(readiness).join(", ")}\n`);
+
+    process.stdout.write("4) hol.chat.sendMessage live run...\n");
+    const sentMessage = await callTool(6, "hol.chat.sendMessage", {
       sessionId: chatSessionId,
       message: "Live run validation ping from HOL MCP server POC.",
+      idempotencyKey: `live-run-message-${Date.now()}`,
     });
     process.stdout.write(`   send response keys: ${Object.keys(sentMessage).join(", ")}\n`);
 
-    process.stdout.write("4) hol.chat.history live run...\n");
-    const history = await callTool(5, "hol.chat.history", {
+    process.stdout.write("5) hol.chat.history live run...\n");
+    const history = await callTool(7, "hol.chat.history", {
       sessionId: chatSessionId,
     });
     process.stdout.write(`   history response keys: ${Object.keys(history).join(", ")}\n`);
 
-    process.stdout.write("5) hol.chat.end live run...\n");
-    await callTool(6, "hol.chat.end", {
+    process.stdout.write("6) hol.chat.resume live run...\n");
+    const resumed = await callTool(8, "hol.chat.resume", {
+      sessionId: chatSessionId,
+    });
+    process.stdout.write(`   resume response keys: ${Object.keys(resumed).join(", ")}\n`);
+
+    process.stdout.write("7) hol.chat.end live run...\n");
+    await callTool(9, "hol.chat.end", {
       sessionId: chatSessionId,
     });
     process.stdout.write("   session ended\n");
 
-    process.stdout.write("6) hol.getRegistrationQuote live run...\n");
+    process.stdout.write("8) hol.getRegistrationQuote live run...\n");
     const profile =
       (typeof firstHit.profile === "object" && firstHit.profile !== null
         ? (firstHit.profile as Record<string, unknown>)
@@ -274,7 +299,7 @@ async function run(): Promise<void> {
       protocol: "mcp",
     };
 
-    const quote = await callTool(7, "hol.getRegistrationQuote", quoteArgs);
+    const quote = await callTool(10, "hol.getRegistrationQuote", quoteArgs);
     process.stdout.write(`   quote response keys: ${Object.keys(quote).join(", ")}\n`);
 
     process.stdout.write("LIVE RUNS PASSED\n");

@@ -9,6 +9,8 @@ import {
   holChatHistoryOutputSchema,
   holChatReadinessInputSchema,
   holChatReadinessOutputSchema,
+  holChatResumeInputSchema,
+  holChatResumeOutputSchema,
   holChatRetryInputSchema,
   holChatRetryOutputSchema,
   holChatSendMessageInputSchema,
@@ -55,6 +57,9 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
       } else {
         payload.agentUrl = args.agentUrl;
       }
+      if (args.forceRefresh === true) {
+        payload.forceRefresh = true;
+      }
 
       return executeTool(ctx, extra, {
         toolName: "hol.chat.readiness",
@@ -96,6 +101,7 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
         historyTtlSeconds: args.historyTtlSeconds,
         encryptionRequested: args.encryptionRequested,
         visibility: args.visibility,
+        idempotencyKey: args.idempotencyKey,
       };
 
       if (args.uaid) {
@@ -152,6 +158,7 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
               historyTtlSeconds: args.historyTtlSeconds,
               encryptionRequested: args.encryptionRequested,
               visibility: args.visibility,
+              idempotencyKey: args.idempotencyKey,
             };
 
             if (args.uaid) {
@@ -251,6 +258,33 @@ export function registerChatTools(server: McpServer, ctx: ToolRegisterContext): 
           ),
         }),
         summary: (data) => `Fetched chat history for session ${data.sessionId}.`,
+      });
+    },
+  );
+
+  server.registerTool(
+    "hol.chat.resume",
+    {
+      title: "Resume Chat Session",
+      description: "Resume a broker chat session and return its route plus history snapshot",
+      inputSchema: holChatResumeInputSchema,
+      outputSchema: holChatResumeOutputSchema,
+    },
+    async (args, extra) => {
+      const authError = ctx.requirePaidToolAuth("hol.chat.resume");
+      if (authError) {
+        return authError;
+      }
+
+      return executeTool(ctx, extra, {
+        toolName: "hol.chat.resume",
+        run: async (traceId) => ({
+          sessionId: args.sessionId,
+          session: await ctx.withBrokerAuth(traceId, "resumeSession", (client) =>
+            client.resumeSession(args.sessionId),
+          ),
+        }),
+        summary: (data) => `Resumed chat session ${data.sessionId}.`,
       });
     },
   );

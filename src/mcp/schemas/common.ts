@@ -127,11 +127,13 @@ export const holChatCreateSessionInputSchema = z.object({
   historyTtlSeconds: z.number().int().positive().optional(),
   encryptionRequested: z.boolean().optional(),
   visibility: z.enum(["private", "public"]).optional(),
+  idempotencyKey: z.string().min(1).optional(),
 });
 
 export const holChatReadinessInputSchema = z.object({
   uaid: z.string().optional(),
   agentUrl: z.string().optional(),
+  forceRefresh: z.boolean().optional(),
 });
 
 export const holChatSendMessageInputSchema = z.object({
@@ -166,6 +168,10 @@ export const holChatRetryInputSchema = z
   });
 
 export const holChatHistoryInputSchema = z.object({
+  sessionId: z.string().min(1),
+});
+
+export const holChatResumeInputSchema = z.object({
   sessionId: z.string().min(1),
 });
 
@@ -282,6 +288,13 @@ export const holChatHistoryOutputSchema = successEnvelopeSchema(
   z.object({
     sessionId: z.string(),
     history: jsonRecordSchema,
+  }),
+);
+
+export const holChatResumeOutputSchema = successEnvelopeSchema(
+  z.object({
+    sessionId: z.string(),
+    session: jsonRecordSchema,
   }),
 );
 

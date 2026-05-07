@@ -71,6 +71,7 @@ export type RegistryBrokerClientLike = {
     sessionId: string,
     options?: Record<string, unknown>,
   ) => Promise<Record<string, unknown>>;
+  resumeSession: (sessionId: string) => Promise<Record<string, unknown>>;
   getRegistrationQuote: (payload: Record<string, unknown>) => Promise<Record<string, unknown>>;
   registerAgent: (payload: Record<string, unknown>) => Promise<Record<string, unknown>>;
   resolveUaid: (uaid: string) => Promise<Record<string, unknown>>;
@@ -103,7 +104,7 @@ export function createRegistryBrokerClient(
   env: BrokerClientEnv,
   traceId: string,
 ): RegistryBrokerClientLike {
-  return new RegistryBrokerClientCtor({
+  const client = new RegistryBrokerClientCtor({
     baseUrl: env.registryBrokerApiUrl,
     apiKey: env.registryBrokerApiKey,
     defaultHeaders: {
@@ -111,6 +112,10 @@ export function createRegistryBrokerClient(
       "x-trace-id": traceId,
     },
     fetchImplementation: createBrokerFetch(env.brokerRequestTimeoutMs),
+  });
+
+  return Object.assign(client, {
+    resumeSession: (sessionId: string) => resumeBrokerSession(env, traceId, sessionId),
   });
 }
 
@@ -128,4 +133,41 @@ function createBrokerFetch(timeoutMs: number): BrokerFetch {
       } as RequestInit & { dispatcher: Agent },
     );
   };
+}
+
+async function resumeBrokerSession(
+  env: BrokerClientEnv,
+  traceId: string,
+  sessionId: string,
+): Promise<Record<string, unknown>> {
+  const baseUrl = env.registryBrokerApiUrl.endsWith("/")
+    ? env.registryBrokerApiUrl.slice(0, -1)
+    : env.registryBrokerApiUrl;
+  const headers: Record<string, string> = {
+    accept: "application/json",
+    "x-app-id": SERVER_NAME,
+    "x-trace-id": traceId,
+  };
+  if (env.registryBrokerApiKey) {
+    headers["x-api-key"] = env.registryBrokerApiKey;
+  }
+
+  const response = await createBrokerFetch(env.brokerRequestTimeoutMs)(
+    `${baseUrl}/chat/session/${encodeURIComponent(sessionId)}/resume`,
+    {
+      headers,
+    },
+  );
+  const payload = await response.json();
+  if (!response.ok) {
+    const message =
+      payload && typeof payload === "object" && "error" in payload
+        ? String((payload as { error: unknown }).error)
+        : `Registry Broker resume failed with HTTP ${response.status}`;
+    throw new Error(message);
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("Registry Broker resume returned a non-object response.");
+  }
+  return payload as Record<string, unknown>;
 }

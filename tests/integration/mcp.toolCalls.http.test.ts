@@ -212,6 +212,7 @@ describe("MCP HTTP tool calls", () => {
       "hol.chat.createSession",
       "hol.chat.sendMessage",
       "hol.chat.history",
+      "hol.chat.resume",
       "hol.chat.end",
       "hol.getRegistrationQuote",
       "hol.registerAgent",

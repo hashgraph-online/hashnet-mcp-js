@@ -57,7 +57,7 @@ Runtime utility endpoints:
 ## Tool Surface
 
 - Discovery: `hol.stats`, `hol.capabilities`, `hol.search`, `hol.vectorSearch`, `hol.resolveUaid`
-- Chat: `hol.chat.createSession`, `hol.chat.sendMessage`, `hol.chat.history`, `hol.chat.end`
+- Chat: `hol.chat.readiness`, `hol.chat.createSession`, `hol.chat.sendMessage`, `hol.chat.retry`, `hol.chat.history`, `hol.chat.resume`, `hol.chat.end`
 - Registration: `hol.getRegistrationQuote`, `hol.registerAgent`, `hol.waitForRegistrationCompletion`
 - Workflows: `workflow.discovery`, `workflow.delegate`, `workflow.registration`
 

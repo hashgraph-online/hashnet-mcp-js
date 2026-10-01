@@ -126,6 +126,7 @@ describe("MCP HTTP tool calls", () => {
       featureMemoryRedis: false,
       featureLedgerAuth: false,
       featureEncryptedChat: false,
+      featureAgentMailbox: false,
     };
 
     const logger = createLogger({ logLevel: "silent" });
@@ -365,6 +366,7 @@ describe("MCP HTTP tool calls", () => {
       featureMemoryRedis: false,
       featureLedgerAuth: false,
       featureEncryptedChat: false,
+      featureAgentMailbox: false,
     };
 
     const logger = createLogger({ logLevel: "silent" });
@@ -528,6 +530,7 @@ describe("MCP HTTP tool calls", () => {
       featureMemoryRedis: false,
       featureLedgerAuth: false,
       featureEncryptedChat: false,
+      featureAgentMailbox: false,
     };
 
     const logger = createLogger({ logLevel: "silent" });
@@ -680,6 +683,7 @@ describe("MCP HTTP tool calls", () => {
       featureMemoryRedis: false,
       featureLedgerAuth: false,
       featureEncryptedChat: false,
+      featureAgentMailbox: false,
     };
 
     const logger = createLogger({ logLevel: "silent" });
@@ -776,6 +780,7 @@ describe("MCP HTTP tool calls", () => {
       featureMemoryRedis: false,
       featureLedgerAuth: false,
       featureEncryptedChat: false,
+      featureAgentMailbox: false,
     };
 
     const logger = createLogger({ logLevel: "silent" });
@@ -855,6 +860,7 @@ describe("MCP HTTP tool calls", () => {
       featureMemoryRedis: false,
       featureLedgerAuth: false,
       featureEncryptedChat: false,
+      featureAgentMailbox: false,
     };
 
     const logger = createLogger({ logLevel: "silent" });
@@ -934,6 +940,7 @@ describe("MCP HTTP tool calls", () => {
       featureMemoryRedis: false,
       featureLedgerAuth: false,
       featureEncryptedChat: false,
+      featureAgentMailbox: false,
     };
 
     const logger = createLogger({ logLevel: "silent" });
@@ -1010,6 +1017,7 @@ describe("MCP HTTP tool calls", () => {
       featureMemoryRedis: false,
       featureLedgerAuth: false,
       featureEncryptedChat: false,
+      featureAgentMailbox: false,
     };
 
     const logger = createLogger({ logLevel: "silent" });

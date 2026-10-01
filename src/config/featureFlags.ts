@@ -4,6 +4,7 @@ export interface FeatureFlags {
   featureMemoryRedis: boolean;
   featureLedgerAuth: boolean;
   featureEncryptedChat: boolean;
+  featureAgentMailbox: boolean;
 }
 
 function parseBooleanFlag(value: string | undefined): boolean {
@@ -22,5 +23,6 @@ export function getFeatureFlags(env: NodeJS.ProcessEnv = process.env): FeatureFl
     featureMemoryRedis: parseBooleanFlag(env.FEATURE_MEMORY_REDIS),
     featureLedgerAuth: parseBooleanFlag(env.FEATURE_LEDGER_AUTH),
     featureEncryptedChat: parseBooleanFlag(env.FEATURE_ENCRYPTED_CHAT),
+    featureAgentMailbox: parseBooleanFlag(env.FEATURE_AGENT_MAILBOX),
   };
 }

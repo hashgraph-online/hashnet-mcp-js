@@ -212,6 +212,7 @@ describe("Guard MCP tools", () => {
       featureMemoryRedis: false,
       featureLedgerAuth: false,
       featureEncryptedChat: false,
+      featureAgentMailbox: false,
     };
 
     const logger = createLogger({ logLevel: "silent" });
@@ -470,6 +471,7 @@ describe("Guard MCP tools", () => {
       featureMemoryRedis: false,
       featureLedgerAuth: true,
       featureEncryptedChat: false,
+      featureAgentMailbox: false,
     };
 
     const logger = createLogger({ logLevel: "silent" });
@@ -574,6 +576,7 @@ describe("Guard MCP tools", () => {
       featureMemoryRedis: false,
       featureLedgerAuth: false,
       featureEncryptedChat: false,
+      featureAgentMailbox: false,
     };
 
     const logger = createLogger({ logLevel: "silent" });

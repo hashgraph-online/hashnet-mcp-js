@@ -13,6 +13,7 @@ import type { EnvConfig } from "../config/env.js";
 import type { FeatureFlags } from "../config/featureFlags.js";
 import type { AppLogger } from "../observability/logger.js";
 import { SERVER_NAME, SERVER_VERSION } from "../constants.js";
+import { registerAgentMailboxTools } from "./tools/agent-mailbox.js";
 import { registerChatTools } from "./tools/chat.js";
 import { registerGuardTools } from "./tools/guard.js";
 import { errorResult } from "./tools/result.js";
@@ -135,6 +136,9 @@ export function createMcpServer(opts: CreateMcpServerOptions): McpServer {
   registerDelegateWorkflow(server, registerContext);
   registerDiscoveryWorkflow(server, registerContext);
   registerRegistrationWorkflow(server, registerContext);
+  if (opts.flags.featureAgentMailbox) {
+    registerAgentMailboxTools(server, registerContext);
+  }
 
   return server;
 }
